@@ -21,6 +21,8 @@ import {
   Scale,
   Smartphone,
   Sparkles,
+  UserPlus,
+  Users,
   Wine,
 } from "lucide-react";
 
@@ -28,7 +30,7 @@ import {
 //  TYPES
 // ════════════════════════════════════════════════════════════════════════════
 
-type Mode = "allowance" | "debt" | "tonight";
+type Mode = "allowance" | "debt" | "tonight" | "friends";
 
 type HabitId = "run" | "gym" | "salad" | "water";
 type ViceId =
@@ -146,6 +148,42 @@ const fmt = (n: number): string =>
   Math.abs(n % 1) < 0.05 ? Math.round(n).toString() : n.toFixed(1);
 
 // ════════════════════════════════════════════════════════════════════════════
+//  FRIENDS / BALANCE BOARD
+//  The point of the app is moderation — too much of anything is bad, booze or
+//  burpees. The board scores everyone on how close to even they keep it.
+// ════════════════════════════════════════════════════════════════════════════
+
+interface Friend {
+  name: string;
+  netME: number;
+  last: string;
+  you?: boolean;
+}
+
+/** Local demo friends until real account sync lands. */
+const SEED_FRIENDS: Friend[] = [
+  { name: "Ori",  netME: 0.5, last: "Gym Workout · 1 session · +2 mi" },
+  { name: "Maya", netME: -1,  last: "Beer · 2 beers · -3 mi" },
+  { name: "Jake", netME: 7.5, last: "Running · 8 miles · +8 mi" },
+];
+
+/** Moderation score: 100 at perfect equilibrium, 0 by ±8 mi of imbalance. */
+const moderation = (me: number): number =>
+  Math.max(0, Math.round(100 - Math.abs(me) * 12.5));
+
+/** Status dot colour for any balance — yours or a friend's. */
+const dotFor = (me: number): string =>
+  me > 0.25 ? "bg-emerald-300" : me < -0.25 ? "bg-amber-300" : "bg-stone-400";
+
+/** Bottom navigation tabs. */
+const TABS: { id: Mode; label: string; icon: React.ReactNode }[] = [
+  { id: "allowance", label: "Allowance", icon: <Footprints className="w-4 h-4" /> },
+  { id: "debt",      label: "Debt",      icon: <Wine className="w-4 h-4" /> },
+  { id: "tonight",   label: "Tonight",   icon: <Moon className="w-4 h-4" /> },
+  { id: "friends",   label: "Friends",   icon: <Users className="w-4 h-4" /> },
+];
+
+// ════════════════════════════════════════════════════════════════════════════
 //  CONTEXT-AWARE SCENARIO MATRIX
 //  The two bottom cards are regenerated on every render from whatever habit /
 //  vice / quantity is live in the controls above — never static, never stale.
@@ -160,6 +198,9 @@ function buildScenarios(
   netME: number,
   tonightPicks: ViceId[],
 ): Scenario[] {
+  // Friends mode has no selection-driven cards.
+  if (mode === "friends") return [];
+
   // ── Allowance: "what does this good work actually buy me?" ──────────────
   if (mode === "allowance") {
     const earned = habitQty * habit.me;
@@ -247,6 +288,8 @@ export default function VicesAiPage() {
   const [habitQty, setHabitQty] = useState<number>(3);
   const [viceQty, setViceQty] = useState<number>(2);
   const [tonightPicks, setTonightPicks] = useState<ViceId[]>(["beer", "cig"]);
+  const [friends, setFriends] = useState<Friend[]>(SEED_FRIENDS);
+  const [newFriend, setNewFriend] = useState<string>("");
 
   /** Signed run-mile balance — the whole ledger reduced to one number. */
   const [netME, setNetME] = useState<number>(0);
@@ -279,6 +322,15 @@ export default function VicesAiPage() {
   useEffect(() => {
     localStorage.setItem("vices-ledger-v2", JSON.stringify({ netME, lastEntry }));
   }, [netME, lastEntry]);
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem("vices-friends-v1");
+      if (raw) setFriends(JSON.parse(raw));
+    } catch { /* corrupted storage — keep seeds */ }
+  }, []);
+  useEffect(() => {
+    localStorage.setItem("vices-friends-v1", JSON.stringify(friends));
+  }, [friends]);
 
   // ── Current selection + reactive math ───────────────────────────────────
   const habit = HABITS.find((h) => h.id === habitId) as BarterItem<HabitId>;
@@ -287,6 +339,7 @@ export default function VicesAiPage() {
   const isAllowance = mode === "allowance";
   const isDebt = mode === "debt";
   const isTonight = mode === "tonight";
+  const isFriends = mode === "friends";
 
   const item = isDebt ? vice : habit;
   const qty = isDebt ? viceQty : habitQty;
@@ -306,13 +359,29 @@ export default function VicesAiPage() {
 
   const scenarios = buildScenarios(mode, habit, habitQty, vice, viceQty, netME, tonightPicks);
 
+  /** Leaderboard: you + friends, ranked by moderation score. */
+  const board = useMemo(() => {
+    const rows: Friend[] = [
+      ...friends,
+      { name: "You", netME, last: lastEntry ?? "No logs yet", you: true },
+    ];
+    return rows.sort((a, b) => moderation(b.netME) - moderation(a.netME));
+  }, [friends, netME, lastEntry]);
+
+  const addFriend = (): void => {
+    const name = newFriend.trim();
+    if (!name || friends.some((f) => f.name.toLowerCase() === name.toLowerCase())) return;
+    setFriends((prev) => [...prev, { name, netME: 0, last: "No logs yet" }]);
+    setNewFriend("");
+  };
+
   // ── Life Balance status (three glowing-dot states) ──────────────────────
   const status =
     netME > 0.25
-      ? { label: "Vitality Surplus", dot: "bg-emerald-400", text: "text-emerald-300", glow: "shadow-[0_0_10px_rgba(52,211,153,0.9)]" }
+      ? { label: "Vitality Surplus", dot: "bg-emerald-300", text: "text-emerald-200", glow: "shadow-[0_0_8px_rgba(110,231,183,0.6)]" }
       : netME < -0.25
-      ? { label: "Karma Deficit",    dot: "bg-rose-400",    text: "text-rose-300",    glow: "shadow-[0_0_10px_rgba(251,113,133,0.9)]" }
-      : { label: "Neutral Zone",     dot: "bg-sky-300",     text: "text-sky-200",     glow: "shadow-[0_0_10px_rgba(125,211,252,0.9)]" };
+      ? { label: "Karma Deficit",    dot: "bg-amber-300",   text: "text-amber-200",   glow: "shadow-[0_0_8px_rgba(252,211,77,0.6)]" }
+      : { label: "Neutral Zone",     dot: "bg-stone-400",   text: "text-stone-300",   glow: "shadow-[0_0_8px_rgba(168,162,158,0.5)]" };
 
   // ── Actions ─────────────────────────────────────────────────────────────
   const logEntry = (): void => {
@@ -334,10 +403,12 @@ export default function VicesAiPage() {
 
   // ── Mode-dependent accent classes ───────────────────────────────────────
   const accent = isAllowance
-    ? { tab: "bg-emerald-400/20 text-emerald-200", text: "text-emerald-300", slider: "vslider-emerald", chip: "bg-emerald-400/15 border-emerald-300/30 text-emerald-200", btn: "bg-gradient-to-r from-emerald-500 to-teal-400 shadow-[0_8px_24px_rgba(52,211,153,0.35)]" }
+    ? { text: "text-emerald-200", slider: "vslider-emerald", chip: "bg-emerald-200/10 border-emerald-200/25 text-emerald-100", btn: "bg-emerald-200 hover:bg-emerald-100" }
     : isDebt
-    ? { tab: "bg-rose-400/20 text-rose-200",       text: "text-rose-300",    slider: "vslider-rose",    chip: "bg-rose-400/15 border-rose-300/30 text-rose-200",          btn: "bg-gradient-to-r from-rose-500 to-amber-400 shadow-[0_8px_24px_rgba(251,113,133,0.35)]" }
-    : { tab: "bg-indigo-400/20 text-indigo-200",   text: "text-indigo-300",  slider: "vslider-indigo",  chip: "bg-indigo-400/15 border-indigo-300/30 text-indigo-200",    btn: "bg-gradient-to-r from-indigo-500 to-violet-400 shadow-[0_8px_24px_rgba(129,140,248,0.35)]" };
+    ? { text: "text-amber-200",   slider: "vslider-amber",   chip: "bg-amber-200/10 border-amber-200/25 text-amber-100",       btn: "bg-amber-200 hover:bg-amber-100" }
+    : isTonight
+    ? { text: "text-sky-200",     slider: "vslider-sky",     chip: "bg-sky-200/10 border-sky-200/25 text-sky-100",             btn: "bg-sky-200 hover:bg-sky-100" }
+    : { text: "text-stone-300",   slider: "vslider-sky",     chip: "bg-white/10 border-white/20 text-stone-200",               btn: "bg-stone-200 hover:bg-stone-100" };
 
   const glass = "rounded-2xl border border-white/10 bg-white/[0.04] backdrop-blur-md";
 
@@ -353,17 +424,17 @@ export default function VicesAiPage() {
         .vslider { -webkit-appearance: none; appearance: none; width: 100%; height: 6px; border-radius: 9999px; background: rgba(255,255,255,0.08); outline: none; }
         .vslider::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; width: 18px; height: 18px; border-radius: 9999px; cursor: pointer; }
         .vslider::-moz-range-thumb { width: 18px; height: 18px; border: none; border-radius: 9999px; cursor: pointer; }
-        .vslider-emerald::-webkit-slider-thumb { background: #34d399; box-shadow: 0 0 14px rgba(52,211,153,0.8); }
-        .vslider-emerald::-moz-range-thumb { background: #34d399; }
-        .vslider-rose::-webkit-slider-thumb { background: #fb7185; box-shadow: 0 0 14px rgba(251,113,133,0.8); }
-        .vslider-rose::-moz-range-thumb { background: #fb7185; }
-        .vslider-indigo::-webkit-slider-thumb { background: #818cf8; box-shadow: 0 0 14px rgba(129,140,248,0.8); }
-        .vslider-indigo::-moz-range-thumb { background: #818cf8; }
+        .vslider-emerald::-webkit-slider-thumb { background: #a7f3d0; }
+        .vslider-emerald::-moz-range-thumb { background: #a7f3d0; }
+        .vslider-amber::-webkit-slider-thumb { background: #fde68a; }
+        .vslider-amber::-moz-range-thumb { background: #fde68a; }
+        .vslider-sky::-webkit-slider-thumb { background: #bae6fd; }
+        .vslider-sky::-moz-range-thumb { background: #bae6fd; }
         @keyframes loadbar { from { width: 0%; } to { width: 100%; } }
       `}</style>
 
       {/* Desktop-only ambient backdrop behind the phone frame */}
-      <div className="pointer-events-none absolute inset-0 hidden lg:block bg-[radial-gradient(ellipse_at_top_left,#101b2e_0%,transparent_55%),radial-gradient(ellipse_at_bottom_right,#0c1f1a_0%,transparent_55%)]" />
+      <div className="pointer-events-none absolute inset-0 hidden lg:block bg-[radial-gradient(ellipse_at_top_left,#1c1917_0%,transparent_60%),radial-gradient(ellipse_at_bottom_right,#18181b_0%,transparent_60%)]" />
 
       {/* ─────────────── PHONE FRAME ───────────────
           Mobile: fills the native viewport edge-to-edge.
@@ -376,15 +447,15 @@ export default function VicesAiPage() {
         {/* ─────────────── SPLASH / LOADING SCREEN ─────────────── */}
         {!splashGone && (
           <div className={`absolute inset-0 z-50 flex flex-col items-center justify-center bg-zinc-950 transition-opacity duration-700 ${splashFading ? "opacity-0" : "opacity-100"}`}>
-            <div className="flex h-20 w-20 items-center justify-center rounded-3xl bg-gradient-to-br from-emerald-400 via-teal-400 to-indigo-400 shadow-[0_0_50px_rgba(52,211,153,0.45)]">
-              <Scale className="h-9 w-9 text-zinc-950" />
+            <div className="flex h-20 w-20 items-center justify-center rounded-3xl bg-stone-100 shadow-[0_0_40px_rgba(255,255,255,0.12)]">
+              <Scale className="h-9 w-9 text-stone-900" />
             </div>
             <h1 className="mt-6 text-4xl font-black tracking-tight">
-              Vices<span className="text-emerald-400">.ai</span>
+              Vices<span className="text-emerald-200">.ai</span>
             </h1>
             <p className="mt-2 text-sm text-zinc-400">Earn your vices the easy way.</p>
             <div className="mt-8 h-1 w-40 overflow-hidden rounded-full bg-white/10">
-              <div className="h-full rounded-full bg-gradient-to-r from-emerald-400 to-teal-300" style={{ animation: "loadbar 2.2s ease-out forwards" }} />
+              <div className="h-full rounded-full bg-gradient-to-r from-stone-200 to-stone-400" style={{ animation: "loadbar 2.2s ease-out forwards" }} />
             </div>
           </div>
         )}
@@ -395,12 +466,12 @@ export default function VicesAiPage() {
           {/* ── HEADER: brand + Life Balance status ── */}
           <header className="flex flex-shrink-0 items-start justify-between">
             <div className="flex items-center gap-2.5">
-              <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-emerald-400 via-teal-400 to-indigo-400 shadow-[0_0_20px_rgba(52,211,153,0.35)]">
-                <Scale className="h-4 w-4 text-zinc-950" />
+              <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-stone-100 shadow-[0_0_16px_rgba(255,255,255,0.1)]">
+                <Scale className="h-4 w-4 text-stone-900" />
               </div>
               <div>
                 <h1 className="text-base font-bold leading-none tracking-tight">
-                  Vices<span className="text-emerald-400">.ai</span>
+                  Vices<span className="text-emerald-200">.ai</span>
                 </h1>
                 <p className="mt-1 text-[8px] uppercase tracking-[0.18em] text-zinc-500">Earn your vices the easy way</p>
               </div>
@@ -414,28 +485,58 @@ export default function VicesAiPage() {
             </div>
           </header>
 
-          {/* ── MODE TOGGLE ── */}
-          <div className="flex flex-shrink-0 rounded-xl border border-white/10 bg-white/5 p-1">
-            {([["allowance", "Allowance"], ["debt", "Debt"], ["tonight", "Tonight"]] as [Mode, string][]).map(([m, label]) => (
-              <button
-                key={m}
-                onClick={() => setMode(m)}
-                className={`flex-1 rounded-lg py-2 text-xs font-semibold transition-colors duration-200 ${mode === m ? accent.tab : "text-zinc-500 hover:text-zinc-300"}`}
-              >
-                {label}
-              </button>
-            ))}
-          </div>
-
           {/* ── MAIN PANEL (the only region allowed to flex) ── */}
           <main className={`no-scrollbar min-h-0 flex-1 overflow-y-auto ${glass} flex flex-col gap-4 p-5`}>
-            {isTonight ? (
+            {isFriends ? (
+              <>
+                {/* Balance Board: who's keeping it the most level */}
+                <div>
+                  <h2 className={`text-xs font-bold uppercase tracking-[0.18em] ${accent.text}`}>Balance Board</h2>
+                  <p className="mt-1 text-[11px] italic text-zinc-500">Moderation in all things.</p>
+                </div>
+                <div className="flex gap-2">
+                  <input
+                    value={newFriend}
+                    onChange={(e) => setNewFriend(e.target.value)}
+                    onKeyDown={(e) => e.key === "Enter" && addFriend()}
+                    placeholder="Add a friend by name"
+                    className="min-w-0 flex-1 rounded-xl border border-white/10 bg-white/5 px-3.5 py-2.5 text-sm placeholder:text-zinc-600 focus:border-white/25 focus:outline-none"
+                  />
+                  <button
+                    onClick={addFriend}
+                    className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl bg-stone-200 text-stone-900 transition-colors hover:bg-stone-100"
+                    aria-label="Add friend"
+                  >
+                    <UserPlus className="h-4 w-4" />
+                  </button>
+                </div>
+                <div className="flex flex-col gap-2">
+                  {board.map((f, i) => (
+                    <div
+                      key={f.name}
+                      className={`flex items-center gap-3 rounded-xl border px-3.5 py-2.5 ${f.you ? "border-white/25 bg-white/[0.08]" : "border-white/10 bg-white/[0.03]"}`}
+                    >
+                      <span className="w-4 flex-shrink-0 text-xs font-bold tabular-nums text-zinc-500">{i + 1}</span>
+                      <div className="min-w-0 flex-1">
+                        <p className="text-[13px] font-semibold text-stone-100">{f.name}</p>
+                        <p className="truncate text-[10px] text-zinc-500">{f.last}</p>
+                      </div>
+                      <div className="flex-shrink-0 text-right">
+                        <p className="text-base font-bold leading-none tabular-nums text-stone-100">{moderation(f.netME)}</p>
+                        <p className="mt-0.5 text-[8px] uppercase tracking-wider text-zinc-500">balance</p>
+                      </div>
+                      <span className={`h-1.5 w-1.5 flex-shrink-0 rounded-full ${dotFor(f.netME)}`} />
+                    </div>
+                  ))}
+                </div>
+                <p className="text-[10px] leading-relaxed text-zinc-600">
+                  Closest to even wins — too much of anything, good or bad, costs points.
+                </p>
+              </>
+            ) : isTonight ? (
               <>
                 {/* Tonight planner: multi-select, then split the surplus */}
-                <div>
-                  <h2 className={`text-xs font-bold uppercase tracking-[0.18em] ${accent.text}`}>Tonight&apos;s Plan</h2>
-                  <p className="mt-1 text-[11px] text-zinc-500">Pick your poisons — today&apos;s surplus gets split across them.</p>
-                </div>
+                <h2 className={`text-xs font-bold uppercase tracking-[0.18em] ${accent.text}`}>Tonight&apos;s Plan</h2>
                 <div className="flex flex-wrap gap-1.5">
                   {TONIGHT_IDS.map((id) => {
                     const v = ALL_VICES.find((x) => x.id === id) as BarterItem<ViceId>;
@@ -452,7 +553,7 @@ export default function VicesAiPage() {
                     );
                   })}
                 </div>
-                <div className="flex items-center gap-2.5 rounded-xl border border-indigo-300/20 bg-white/[0.03] px-3.5 py-2.5">
+                <div className="flex items-center gap-2.5 rounded-xl border border-white/10 bg-white/[0.03] px-3.5 py-2.5">
                   <Moon className={`h-4 w-4 flex-shrink-0 ${accent.text}`} />
                   <p className="text-[11px] leading-relaxed text-zinc-400">
                     Tonight&apos;s budget: <span className={`font-bold ${accent.text}`}>{fmt(tonightBudget)} run-miles</span> — earned from today&apos;s logged exercise.
@@ -479,14 +580,9 @@ export default function VicesAiPage() {
             ) : (
               <>
                 {/* Allowance / Debt: one item, one slider, one log button */}
-                <div>
-                  <h2 className={`text-xs font-bold uppercase tracking-[0.18em] ${accent.text}`}>
-                    {isAllowance ? "Earned Allowance" : "Debt Recovery"}
-                  </h2>
-                  <p className="mt-1 text-[11px] text-zinc-500">
-                    {isAllowance ? "Log the good work — see what it buys." : "Confess the indulgence — see what it costs."}
-                  </p>
-                </div>
+                <h2 className={`text-xs font-bold uppercase tracking-[0.18em] ${accent.text}`}>
+                  {isAllowance ? "Earned Allowance" : "Debt Recovery"}
+                </h2>
 
                 {isAllowance ? (
                   /* Habits are few enough for a flat chip row */
@@ -548,7 +644,7 @@ export default function VicesAiPage() {
 
                 <button
                   onClick={logEntry}
-                  className={`mt-auto w-full rounded-xl py-3.5 text-sm font-bold text-zinc-950 transition-transform active:scale-[0.98] ${accent.btn}`}
+                  className={`mt-auto w-full rounded-xl py-3.5 text-sm font-bold text-stone-900 transition-all active:scale-[0.98] ${accent.btn}`}
                 >
                   Log to Ledger
                 </button>
@@ -560,7 +656,7 @@ export default function VicesAiPage() {
           <div className={`${glass} flex flex-shrink-0 items-center gap-3 px-4 py-3`}>
             <div className="flex-shrink-0">
               <p className="text-[8px] font-semibold uppercase tracking-[0.2em] text-zinc-500">Vibe Ledger</p>
-              <p className={`text-xl font-bold tabular-nums leading-tight ${netME > 0.25 ? "text-emerald-300" : netME < -0.25 ? "text-rose-300" : "text-sky-200"}`}>
+              <p className={`text-xl font-bold tabular-nums leading-tight ${netME > 0.25 ? "text-emerald-200" : netME < -0.25 ? "text-amber-200" : "text-stone-300"}`}>
                 {netME >= 0 ? "+" : ""}{fmt(netME)} mi
               </p>
             </div>
@@ -576,17 +672,33 @@ export default function VicesAiPage() {
             </button>
           </div>
 
-          {/* ── DYNAMIC SCENARIO CARDS: follow the live selection above ── */}
-          <div className="grid flex-shrink-0 grid-cols-2 gap-2.5">
-            {scenarios.map((s) => (
-              <div key={s.q} className={`${glass} px-3.5 py-3`}>
-                <p className="text-[10px] font-semibold leading-snug text-zinc-400">{s.q}</p>
-                <p className={`mt-1.5 text-[11px] font-bold leading-snug ${s.tone === "good" ? "text-emerald-300" : s.tone === "bad" ? "text-rose-300" : "text-sky-200"}`}>
-                  {s.a}
-                </p>
-              </div>
+          {/* ── DYNAMIC SCENARIO CARDS (hidden in modes with none) ── */}
+          {scenarios.length > 0 && (
+            <div className="grid flex-shrink-0 grid-cols-2 gap-2.5">
+              {scenarios.map((s) => (
+                <div key={s.q} className={`${glass} px-3.5 py-3`}>
+                  <p className="text-[10px] font-semibold leading-snug text-zinc-400">{s.q}</p>
+                  <p className={`mt-1.5 text-[11px] font-bold leading-snug ${s.tone === "good" ? "text-emerald-200" : s.tone === "bad" ? "text-amber-200" : "text-sky-200"}`}>
+                    {s.a}
+                  </p>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* ── BOTTOM TAB BAR ── */}
+          <nav className="flex flex-shrink-0 rounded-2xl border border-white/10 bg-white/5 p-1">
+            {TABS.map(({ id, label, icon }) => (
+              <button
+                key={id}
+                onClick={() => setMode(id)}
+                className={`flex flex-1 flex-col items-center gap-1 rounded-xl py-2 transition-colors ${mode === id ? "bg-white/10 text-stone-100" : "text-zinc-500 hover:text-zinc-300"}`}
+              >
+                {icon}
+                <span className="text-[9px] font-semibold">{label}</span>
+              </button>
             ))}
-          </div>
+          </nav>
         </div>
 
         {/* ─────────────── CATEGORIZED VICE PICKER (bottom sheet) ─────────────── */}
