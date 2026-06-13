@@ -1,12 +1,16 @@
 "use client";
 
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
+  Apple,
+  Beef,
   Beer,
+  Bike,
   Candy,
   ChevronDown,
   Check,
   Cigarette,
+  Crown,
   CupSoda,
   Droplets,
   Dumbbell,
@@ -14,30 +18,41 @@ import {
   Flame,
   Footprints,
   Leaf,
+  Lock,
   Martini,
-  Moon,
-  RotateCcw,
+  PersonStanding,
   Salad,
   Scale,
+  ShoppingBag,
+  Skull,
   Smartphone,
+  Snowflake,
   Sparkles,
+  Trophy,
   UserPlus,
   Users,
+  Utensils,
+  Wallet,
   Wine,
+  Zap,
 } from "lucide-react";
 
 // ════════════════════════════════════════════════════════════════════════════
 //  TYPES
 // ════════════════════════════════════════════════════════════════════════════
 
-type Mode = "allowance" | "debt" | "tonight" | "friends";
+type Mode = "allowance" | "store" | "friends";
 
-type HabitId = "run" | "gym" | "meal" | "water";
+type HabitCatId = "workout" | "meal" | "water" | "cold";
+type HabitId =
+  | "run" | "lift" | "hiit" | "cardio" | "sport" | "yoga"
+  | "salad" | "balanced" | "protein" | "cleanswap"
+  | "water" | "cold";
 type ViceId =
   | "beer" | "shot" | "drink"
   | "cig" | "joint" | "edible" | "dab"
   | "porn" | "scroll"
-  | "night";
+  | "crawl" | "night" | "rave" | "bender";
 
 /** A selectable item (habit or vice) with its mile-equivalent exchange rate. */
 interface BarterItem<Id extends string> {
@@ -48,6 +63,8 @@ interface BarterItem<Id extends string> {
   plural: string;
   /** Unit label for the slider readout, e.g. "miles", "beers". */
   unit: string;
+  /** Singular unit, e.g. "mile", "beer" — used when the count is exactly 1. */
+  unitOne: string;
   /** Mile-equivalents per single unit. Canonical currency of the engine. */
   me: number;
   min: number;
@@ -66,34 +83,87 @@ interface ViceCategory {
   vices: BarterItem<ViceId>[];
 }
 
-/** One context-aware scenario card. Tone drives the answer colour. */
-interface Scenario {
-  q: string;
-  a: string;
-  tone: "good" | "bad" | "info";
+/** Habits are grouped too: a top-row chip opens a sub-picker of its options.
+ *  Single-option categories (water, cold) skip the sub-row and go straight to
+ *  the slider. */
+interface HabitCategory {
+  id: HabitCatId;
+  label: string;
+  short: string;
+  icon: React.ReactNode;
+  options: BarterItem<HabitId>[];
 }
 
 // ════════════════════════════════════════════════════════════════════════════
-//  EXCHANGE-RATE TABLES (canonical currency: run-mile equivalents, "ME")
+//  EXCHANGE-RATE TABLES (canonical currency: POINTS — harder effort earns more,
+//  bigger indulgences cost more. Same currency the leaderboard ranks on.)
 //
-//  Degenerate-friendly rates — generous enough to feel achievable:
-//  Vices:   beer 1 · shot 0.75 · weed drink 0.75 · cigarette 0.25 · joint 1.5
-//           edible 1 · dab 2 · porn 0.5 · infinite scroll 0.5/hr · night out 4
-//  Habits:  run 1/mi · gym 2/workout · good meal 1.5 · water 0.25/glass
+//  Earn (habits) — Workout: run 10/mi · lift 20 · hiit 20 · cardio 15 · sport 15 · yoga 10
+//           Meal (modest — eating well is table stakes): salad/home/clean 5 · protein 8
+//           Water 1/glass (easy, so cheap) · Cold plunge 5 each
+//  Spend (vices): beer 10 · shot 10 · weed drink 15 · cigarette 15 · joint 30
+//           edible 25 · dab 30 · porn 30 · scroll 10 · big nights 50–90
 //
-//  Barter rules:
-//  · 1 Beer            = 1 mi run     OR 1 good meal (with change to spare)
-//  · 1 Cigarette       = 0.25 mi run
-//  · 1 Cannabis sesh   = 1.5 mi run   OR 1 gym workout
-//  · 1 Heavy Night Out = 4 mi run     OR 3 good meals
+//  Anchors the user set:
+//  · 1 Beer            = 10 pts
+//  · Run 3 mi (30 pts) = 3 beers · 2 cigs · 1 joint   (single-vice maxes)
+//  · 2 lift sessions   = one 4 mi run                 (both 40 pts)
+//  · 6 glasses water   = 6 pts                          (deliberately small)
 // ════════════════════════════════════════════════════════════════════════════
 
-const HABITS: BarterItem<HabitId>[] = [
-  { id: "run",   label: "Running",     short: "Run",   plural: "Miles",    unit: "miles",   me: 1,    min: 0.5, max: 10, step: 0.5, def: 3, icon: <Footprints className="w-4 h-4" /> },
-  { id: "gym",   label: "Gym Workout", short: "Gym",   plural: "Workouts", unit: "sessions", me: 2,   min: 1,   max: 4,  step: 1,   def: 1, icon: <Dumbbell className="w-4 h-4" /> },
-  { id: "meal",  label: "Good Meal",   short: "Meal",  plural: "Meals",    unit: "meals",   me: 1.5,  min: 1,   max: 6,  step: 1,   def: 2, icon: <Salad className="w-4 h-4" /> },
-  { id: "water", label: "Hydration",   short: "Water", plural: "Glasses",  unit: "glasses", me: 0.25, min: 1,   max: 12, step: 1,   def: 4, icon: <Droplets className="w-4 h-4" /> },
+const HABIT_CATS: HabitCategory[] = [
+  {
+    id: "workout",
+    label: "Workout",
+    short: "Workout",
+    icon: <Dumbbell className="w-4 h-4" />,
+    options: [
+      { id: "run",    label: "Run",             plural: "Miles",    unit: "miles",    unitOne: "mile",    me: 10, min: 0.5, max: 10, step: 0.5, def: 3, icon: <Footprints className="w-4 h-4" /> },
+      { id: "lift",   label: "Lifting",         plural: "Sessions", unit: "sessions", unitOne: "session", me: 20, min: 1,   max: 3,  step: 1,   def: 1, icon: <Dumbbell className="w-4 h-4" /> },
+      { id: "hiit",   label: "HIIT",            plural: "Sessions", unit: "sessions", unitOne: "session", me: 20, min: 1,   max: 3,  step: 1,   def: 1, icon: <Zap className="w-4 h-4" /> },
+      { id: "cardio", label: "Cardio",          plural: "Sessions", unit: "sessions", unitOne: "session", me: 15, min: 1,   max: 3,  step: 1,   def: 1, icon: <Bike className="w-4 h-4" /> },
+      { id: "sport",  label: "Team Sport",      plural: "Sessions", unit: "sessions", unitOne: "session", me: 15, min: 1,   max: 3,  step: 1,   def: 1, icon: <Trophy className="w-4 h-4" /> },
+      { id: "yoga",   label: "Yoga / Mobility", plural: "Sessions", unit: "sessions", unitOne: "session", me: 10, min: 1,   max: 3,  step: 1,   def: 1, icon: <PersonStanding className="w-4 h-4" /> },
+    ],
+  },
+  {
+    id: "meal",
+    label: "Meal",
+    short: "Meal",
+    icon: <Salad className="w-4 h-4" />,
+    options: [
+      { id: "salad",     label: "Salad / Greens", plural: "Meals", unit: "meals", unitOne: "meal", me: 5, min: 1, max: 6, step: 1, def: 1, icon: <Salad className="w-4 h-4" /> },
+      { id: "balanced",  label: "Home-cooked",    plural: "Meals", unit: "meals", unitOne: "meal", me: 5, min: 1, max: 6, step: 1, def: 1, icon: <Utensils className="w-4 h-4" /> },
+      { id: "protein",   label: "High-protein",   plural: "Meals", unit: "meals", unitOne: "meal", me: 8, min: 1, max: 6, step: 1, def: 1, icon: <Beef className="w-4 h-4" /> },
+      { id: "cleanswap", label: "Clean Swap",     plural: "Meals", unit: "meals", unitOne: "meal", me: 5, min: 1, max: 6, step: 1, def: 1, icon: <Apple className="w-4 h-4" /> },
+    ],
+  },
+  {
+    id: "water",
+    label: "Hydration",
+    short: "Water",
+    icon: <Droplets className="w-4 h-4" />,
+    options: [
+      { id: "water", label: "Hydration", plural: "Glasses", unit: "glasses", unitOne: "glass", me: 1, min: 1, max: 12, step: 1, def: 6, icon: <Droplets className="w-4 h-4" /> },
+    ],
+  },
+  {
+    id: "cold",
+    label: "Cold Plunge",
+    short: "Cold",
+    icon: <Snowflake className="w-4 h-4" />,
+    options: [
+      { id: "cold", label: "Cold Plunge", plural: "Plunges", unit: "plunges", unitOne: "plunge", me: 5, min: 1, max: 4, step: 1, def: 1, icon: <Snowflake className="w-4 h-4" /> },
+    ],
+  },
 ];
+
+/** Flattened habit options for direct id lookup. */
+const ALL_HABITS: BarterItem<HabitId>[] = HABIT_CATS.flatMap((c) => c.options);
+
+/** Which category a given habit option belongs to. */
+const catOf = (id: HabitId): HabitCatId =>
+  HABIT_CATS.find((c) => c.options.some((o) => o.id === id))?.id ?? "workout";
 
 const VICE_CATEGORIES: ViceCategory[] = [
   {
@@ -101,9 +171,9 @@ const VICE_CATEGORIES: ViceCategory[] = [
     label: "Drinks & Liquor",
     icon: <Beer className="w-4 h-4" />,
     vices: [
-      { id: "beer",  label: "Beer",           plural: "Beers",       unit: "beers",  me: 1,    min: 1, max: 12, step: 1, def: 2, icon: <Beer className="w-4 h-4" /> },
-      { id: "shot",  label: "Shot of Liquor", plural: "Shots",       unit: "shots",  me: 0.75, min: 1, max: 10, step: 1, def: 2, icon: <Wine className="w-4 h-4" /> },
-      { id: "drink", label: "Weed Drink",     plural: "Weed Drinks", unit: "drinks", me: 0.75, min: 1, max: 8,  step: 1, def: 1, icon: <CupSoda className="w-4 h-4" /> },
+      { id: "beer",  label: "Beer",           plural: "Beers",       unit: "beers",  unitOne: "beer",  me: 10, min: 1, max: 12, step: 1, def: 2, icon: <Beer className="w-4 h-4" /> },
+      { id: "shot",  label: "Shot of Liquor", plural: "Shots",       unit: "shots",  unitOne: "shot",  me: 10, min: 1, max: 10, step: 1, def: 2, icon: <Wine className="w-4 h-4" /> },
+      { id: "drink", label: "Weed Drink",     plural: "Weed Drinks", unit: "drinks", unitOne: "drink", me: 15, min: 1, max: 8,  step: 1, def: 1, icon: <CupSoda className="w-4 h-4" /> },
     ],
   },
   {
@@ -111,10 +181,10 @@ const VICE_CATEGORIES: ViceCategory[] = [
     label: "Smoke & Herb",
     icon: <Leaf className="w-4 h-4" />,
     vices: [
-      { id: "cig",    label: "Cigarette", plural: "Cigarettes", unit: "cigarettes", me: 0.25, min: 1, max: 20, step: 1, def: 4, icon: <Cigarette className="w-4 h-4" /> },
-      { id: "joint",  label: "Joint",     plural: "Joints",     unit: "joints",     me: 1.5,  min: 1, max: 6,  step: 1, def: 1, icon: <Leaf className="w-4 h-4" /> },
-      { id: "edible", label: "Edible",    plural: "Edibles",    unit: "edibles",    me: 1,    min: 1, max: 8,  step: 1, def: 1, icon: <Candy className="w-4 h-4" /> },
-      { id: "dab",    label: "Dab",       plural: "Dabs",       unit: "dabs",       me: 2,    min: 1, max: 6,  step: 1, def: 1, icon: <Flame className="w-4 h-4" /> },
+      { id: "cig",    label: "Cigarette", plural: "Cigarettes", unit: "cigarettes", unitOne: "cigarette", me: 15, min: 1, max: 10, step: 1, def: 2, icon: <Cigarette className="w-4 h-4" /> },
+      { id: "joint",  label: "Joint",     plural: "Joints",     unit: "joints",     unitOne: "joint",     me: 30, min: 1, max: 6,  step: 1, def: 1, icon: <Leaf className="w-4 h-4" /> },
+      { id: "edible", label: "Edible",    plural: "Edibles",    unit: "edibles",    unitOne: "edible",    me: 25, min: 1, max: 8,  step: 1, def: 1, icon: <Candy className="w-4 h-4" /> },
+      { id: "dab",    label: "Dab",       plural: "Dabs",       unit: "dabs",       unitOne: "dab",       me: 30, min: 1, max: 6,  step: 1, def: 1, icon: <Flame className="w-4 h-4" /> },
     ],
   },
   {
@@ -122,8 +192,8 @@ const VICE_CATEGORIES: ViceCategory[] = [
     label: "Digital Dopamine",
     icon: <Smartphone className="w-4 h-4" />,
     vices: [
-      { id: "porn",   label: "Porn Session",    plural: "Porn Sessions", unit: "sessions", me: 0.5, min: 1, max: 6, step: 1, def: 1, icon: <EyeOff className="w-4 h-4" /> },
-      { id: "scroll", label: "Infinite Scroll", plural: "Scroll Hours",  unit: "hours",    me: 0.5, min: 1, max: 8, step: 1, def: 2, icon: <Smartphone className="w-4 h-4" /> },
+      { id: "porn",   label: "Porn Session",            plural: "Porn Sessions",   unit: "sessions", unitOne: "session", me: 30, min: 1, max: 6, step: 1, def: 1, icon: <EyeOff className="w-4 h-4" /> },
+      { id: "scroll", label: "Scroll Session (30 min)", plural: "Scroll Sessions", unit: "sessions", unitOne: "session", me: 10, min: 1, max: 8, step: 1, def: 1, icon: <Smartphone className="w-4 h-4" /> },
     ],
   },
   {
@@ -131,147 +201,162 @@ const VICE_CATEGORIES: ViceCategory[] = [
     label: "Big Nights",
     icon: <Martini className="w-4 h-4" />,
     vices: [
-      { id: "night", label: "Heavy Night Out", plural: "Heavy Nights", unit: "nights", me: 4, min: 1, max: 3, step: 1, def: 1, icon: <Martini className="w-4 h-4" /> },
+      { id: "crawl",  label: "Bar Crawl",       plural: "Bar Crawls",   unit: "crawls",  unitOne: "crawl",  me: 50, min: 1, max: 3, step: 1, def: 1, icon: <Beer className="w-4 h-4" /> },
+      { id: "night",  label: "Heavy Night Out", plural: "Heavy Nights", unit: "nights",  unitOne: "night",  me: 60, min: 1, max: 3, step: 1, def: 1, icon: <Martini className="w-4 h-4" /> },
+      { id: "rave",   label: "Rave / Festival", plural: "Raves",        unit: "raves",   unitOne: "rave",   me: 70, min: 1, max: 3, step: 1, def: 1, icon: <Sparkles className="w-4 h-4" /> },
+      { id: "bender", label: "Full Bender",     plural: "Benders",      unit: "benders", unitOne: "bender", me: 90, min: 1, max: 2, step: 1, def: 1, icon: <Flame className="w-4 h-4" /> },
     ],
   },
 ];
 
 const ALL_VICES: BarterItem<ViceId>[] = VICE_CATEGORIES.flatMap((c) => c.vices);
 
-/** Vices selectable in the Tonight planner (single events, not whole nights). */
-const TONIGHT_IDS: ViceId[] = ["beer", "shot", "cig", "joint", "edible", "dab", "drink"];
-
-/** The cannabis family pays its debt at the gym (1 workout per 2 ME). */
-const CANNABIS_IDS: ViceId[] = ["joint", "edible", "dab", "drink"];
-
 /** Format a number cleanly: integers stay whole, fractions get one decimal. */
 const fmt = (n: number): string =>
   Math.abs(n % 1) < 0.05 ? Math.round(n).toString() : n.toFixed(1);
 
+const round2 = (n: number): number => Math.round(n * 100) / 100;
+
+/** Single source of truth for scenario math — never hardcode a rate twice. */
+const viceME = (id: ViceId): number => ALL_VICES.find((v) => v.id === id)?.me ?? 1;
+const habitME = (id: HabitId): number => ALL_HABITS.find((h) => h.id === id)?.me ?? 1;
+const viceBy = (id: ViceId): BarterItem<ViceId> => ALL_VICES.find((v) => v.id === id) as BarterItem<ViceId>;
+
+/** How many WHOLE units a point budget buys — always rounded down, never up.
+ *  You only get what you've fully banked: 15 pts = 1 beer, not 1.5. */
+const buys = (points: number, rate: number): number => Math.max(0, Math.floor(points / rate));
+
+/** "1 beer" vs "2 beers" — picks the singular noun only at exactly one. */
+const plur = (n: number, one: string, many: string): string =>
+  `${fmt(n)} ${Math.abs(n) === 1 ? one : many}`;
+
+/** A realistic mixed spend for a budget: lean on beers, top up with cigs.
+ *  Answers "or you could mix it: a beer and a couple cigs." */
+const comboFor = (budget: number): string => {
+  const beerR = viceME("beer");
+  const cigR = viceME("cig");
+  const beers = Math.floor((budget * 0.6) / beerR);
+  const rest = budget - beers * beerR;
+  const cigs = Math.floor(rest / cigR);
+  const parts: string[] = [];
+  if (beers > 0) parts.push(plur(beers, "beer", "beers"));
+  if (cigs > 0) parts.push(plur(cigs, "cig", "cigs"));
+  if (parts.length > 0) return parts.join(" + ");
+  if (budget >= beerR) return plur(1, "beer", "beers");
+  if (budget >= cigR) return plur(1, "cig", "cigs");
+  return "nothing yet — keep earning";
+};
+
+/** ISO date of this week's Monday. The ledger lives one week, then resets. */
+const weekOf = (): string => {
+  const d = new Date();
+  d.setHours(0, 0, 0, 0);
+  d.setDate(d.getDate() - ((d.getDay() + 6) % 7));
+  return d.toISOString().slice(0, 10);
+};
+
 // ════════════════════════════════════════════════════════════════════════════
-//  FRIENDS / BALANCE BOARD
-//  The point of the app is moderation — too much of anything is bad, booze or
-//  burpees. The board scores everyone on how close to even they keep it.
+//  FRIENDS / LEADERBOARD
+//  Every player carries weekly earned (habit) and spent (vice) mile totals, so
+//  the board can rank the group through whatever lens the metric chips select.
 // ════════════════════════════════════════════════════════════════════════════
 
 interface Friend {
   name: string;
-  netME: number;
+  /** Habit-miles banked this week. */
+  earned: number;
+  /** Vice-miles burned this week. */
+  spent: number;
   last: string;
   you?: boolean;
 }
 
+/** A friend with their net balance precomputed for metric scoring. */
+type Ranked = Friend & { net: number };
+
 /** Local demo friends until real account sync lands. */
 const SEED_FRIENDS: Friend[] = [
-  { name: "Ori",  netME: 0.5, last: "Gym Workout · 1 session · +2 mi" },
-  { name: "Maya", netME: -1,  last: "Beer · 2 beers · -2 mi" },
-  { name: "Jake", netME: 7.5, last: "Running · 8 miles · +8 mi" },
+  { name: "Ori",  earned: 40, spent: 35, last: "Gym Workout · 1 session · +20 pts" },
+  { name: "Maya", earned: 20, spent: 30, last: "Beer · 2 beers · -20 pts" },
+  { name: "Jake", earned: 90, spent: 15, last: "Running · 8 miles · +80 pts" },
+  { name: "Zoe",  earned: 15, spent: 70, last: "Heavy Night Out · 1 night · -60 pts" },
 ];
 
-/** Moderation score: 100 at perfect equilibrium, 0 by ±8 mi of imbalance. */
-const moderation = (me: number): number =>
-  Math.max(0, Math.round(100 - Math.abs(me) * 12.5));
+/** Moderation score: 100 at perfect equilibrium, 0 by ±80 pts of imbalance. */
+const moderation = (pts: number): number =>
+  Math.max(0, Math.round(100 - Math.abs(pts) * 1.25));
 
 /** Status dot colour for any balance — yours or a friend's. */
-const dotFor = (me: number): string =>
-  me > 0.25 ? "bg-emerald-500" : me < -0.25 ? "bg-amber-400" : "bg-stone-300";
+const dotFor = (pts: number): string =>
+  pts > 2.5 ? "bg-emerald-500" : pts < -2.5 ? "bg-amber-400" : "bg-stone-300";
+
+type MetricId = "balanced" | "degen" | "dork";
+
+/** One lens on the leaderboard — its own scoring, colour, and trash talk. */
+interface Metric {
+  id: MetricId;
+  label: string;
+  tagline: string;
+  unit: string;
+  icon: React.ReactNode;
+  score: (f: Ranked) => number;
+  text: string;
+  chipOn: string;
+  /** rgba colour feeding the champion card's pulsing glow. */
+  glow: string;
+}
+
+const METRICS: Metric[] = [
+  {
+    id: "balanced",
+    label: "Balanced",
+    tagline: "Closest to even wins — extremes cost points, good or bad.",
+    unit: "pts",
+    icon: <Scale className="w-4 h-4" />,
+    score: (f) => moderation(f.net),
+    text: "text-emerald-600",
+    chipOn: "border-emerald-500 bg-emerald-500 text-white shadow-lg shadow-emerald-500/30",
+    glow: "rgba(16,185,129,0.45)",
+  },
+  {
+    id: "degen",
+    label: "Degen",
+    tagline: "Most points torched on vices this week. Wear it proudly. Or don't.",
+    unit: "pts burned",
+    icon: <Skull className="w-4 h-4" />,
+    score: (f) => f.spent,
+    text: "text-rose-600",
+    chipOn: "border-rose-500 bg-rose-500 text-white shadow-lg shadow-rose-500/30",
+    glow: "rgba(244,63,94,0.45)",
+  },
+  {
+    id: "dork",
+    label: "Dork",
+    tagline: "Most points banked from good habits. Insufferable, honestly.",
+    unit: "pts earned",
+    icon: <Sparkles className="w-4 h-4" />,
+    score: (f) => f.earned,
+    text: "text-sky-600",
+    chipOn: "border-sky-500 bg-sky-500 text-white shadow-lg shadow-sky-500/30",
+    glow: "rgba(14,165,233,0.45)",
+  },
+];
 
 /** Bottom navigation tabs. */
 const TABS: { id: Mode; label: string; icon: React.ReactNode }[] = [
   { id: "allowance", label: "Allowance", icon: <Footprints className="w-4 h-4" /> },
-  { id: "debt",      label: "Debt",      icon: <Wine className="w-4 h-4" /> },
-  { id: "tonight",   label: "Tonight",   icon: <Moon className="w-4 h-4" /> },
+  { id: "store",     label: "Store",     icon: <ShoppingBag className="w-4 h-4" /> },
   { id: "friends",   label: "Friends",   icon: <Users className="w-4 h-4" /> },
 ];
 
-// ════════════════════════════════════════════════════════════════════════════
-//  CONTEXT-AWARE SCENARIO MATRIX
-//  The two bottom cards are regenerated on every render from whatever habit /
-//  vice / quantity is live in the controls above — never static, never stale.
-// ════════════════════════════════════════════════════════════════════════════
+/** Confetti palettes for the log-entry burst. */
+const CONFETTI_GOOD = ["#10b981", "#34d399", "#0ea5e9", "#a3e635"];
+const CONFETTI_BAD = ["#f59e0b", "#fb923c", "#f43f5e", "#facc15"];
 
-function buildScenarios(
-  mode: Mode,
-  habit: BarterItem<HabitId>,
-  habitQty: number,
-  vice: BarterItem<ViceId>,
-  viceQty: number,
-  netME: number,
-  tonightPicks: ViceId[],
-): Scenario[] {
-  // Friends mode has no selection-driven cards.
-  if (mode === "friends") return [];
-
-  // ── Allowance: "what does this good work actually buy me?" ──────────────
-  if (mode === "allowance") {
-    const earned = habitQty * habit.me;
-    switch (habit.id) {
-      case "run":
-        return [
-          { q: `What does ${fmt(habitQty)} mi buy?`, a: `${fmt(earned)} beers · ${fmt(earned / 0.25)} cigs`, tone: "info" },
-          {
-            q: "Cover 3 beers tonight?",
-            a: earned >= 3 ? "Yes — 3 mi banked" : `Need ${fmt(3 - earned)} more mi`,
-            tone: earned >= 3 ? "good" : "bad",
-          },
-        ];
-      case "gym":
-        return [
-          {
-            q: "Joint after the gym?",
-            a: earned >= 1.5 ? "Covered — net zero" : `Short ${fmt(1.5 - earned)} mi`,
-            tone: earned >= 1.5 ? "good" : "bad",
-          },
-          { q: `${fmt(habitQty)} workout${habitQty === 1 ? "" : "s"} buys`, a: `${fmt(earned)} beers · ${fmt(earned / 0.25)} cigs`, tone: "info" },
-        ];
-      case "meal":
-        return [
-          { q: "Beer with this meal?", a: habitQty >= 1 ? "Yes — covered, with change" : "Not quite", tone: habitQty >= 1 ? "good" : "bad" },
-          { q: `${fmt(habitQty)} meal${habitQty === 1 ? "" : "s"} erases`, a: `${fmt(habitQty * 6)} cigarettes`, tone: "info" },
-        ];
-      case "water":
-        return [
-          { q: `${fmt(habitQty)} glass${habitQty === 1 ? "" : "es"} buys`, a: `${fmt(earned)} beers`, tone: "info" },
-          { q: "Night out tonight?", a: "4 mi · or 3 good meals", tone: "info" },
-        ];
-    }
-  }
-
-  // ── Debt: "what does this indulgence cost, and am I covered?" ───────────
-  if (mode === "debt") {
-    const owed = viceQty * vice.me;
-    const payback =
-      vice.id === "night"
-        ? `${3 * viceQty} good meals`
-        : CANNABIS_IDS.includes(vice.id)
-        ? `${fmt(Math.ceil(owed / 2))} gym workout${Math.ceil(owed / 2) === 1 ? "" : "s"}`
-        : `${fmt(owed / 1.5)} good meals`;
-    return [
-      { q: `Pay off ${fmt(viceQty)} ${viceQty === 1 ? vice.label.toLowerCase() : vice.unit}?`, a: `${fmt(owed)} mi run · or ${payback}`, tone: "info" },
-      {
-        q: "Can my balance cover it?",
-        a: netME >= owed ? "Yes — fully banked" : `Short ${fmt(owed - netME)} mi`,
-        tone: netME >= owed ? "good" : "bad",
-      },
-    ];
-  }
-
-  // ── Tonight: "is the evening I'm planning actually funded?" ─────────────
-  const budget = Math.max(netME, 0);
-  const oneOfEach = tonightPicks.reduce(
-    (sum, id) => sum + (ALL_VICES.find((v) => v.id === id)?.me ?? 0),
-    0,
-  );
-  return [
-    { q: "Tonight's budget?", a: `${fmt(budget)} run-miles`, tone: budget > 0 ? "good" : "bad" },
-    tonightPicks.length === 0
-      ? { q: "One of each pick?", a: "Pick a vice first", tone: "info" }
-      : {
-          q: "One of each pick?",
-          a: oneOfEach <= budget ? `Covered — ${fmt(oneOfEach)} mi` : `Need ${fmt(oneOfEach - budget)} more mi`,
-          tone: oneOfEach <= budget ? "good" : "bad",
-        },
-  ];
+/** One in-flight log celebration: a particle shower off the log button. */
+interface Burst {
+  id: number;
+  parts: { k: string; dx: string; dy: string; c: string; d: string }[];
 }
 
 // ════════════════════════════════════════════════════════════════════════════
@@ -282,20 +367,26 @@ export default function VicesAiPage() {
   // ── Core state ──────────────────────────────────────────────────────────
   const [mode, setMode] = useState<Mode>("allowance");
   const [habitId, setHabitId] = useState<HabitId>("run");
-  const [viceId, setViceId] = useState<ViceId>("beer");
   const [habitQty, setHabitQty] = useState<number>(3);
-  const [viceQty, setViceQty] = useState<number>(2);
-  const [tonightPicks, setTonightPicks] = useState<ViceId[]>(["beer", "cig"]);
   const [friends, setFriends] = useState<Friend[]>(SEED_FRIENDS);
   const [newFriend, setNewFriend] = useState<string>("");
+  const [metric, setMetric] = useState<MetricId>("balanced");
 
-  /** Signed run-mile balance — the whole ledger reduced to one number. */
-  const [netME, setNetME] = useState<number>(0);
+  /** Store: a transient "you bought X" toast after a purchase. */
+  const [toast, setToast] = useState<{ id: number; label: string; pts: number } | null>(null);
+
+  /** Weekly point totals — earned by habits, spent on vices. Net is derived. */
+  const [earnedME, setEarnedME] = useState<number>(0);
+  const [spentME, setSpentME] = useState<number>(0);
   const [lastEntry, setLastEntry] = useState<string | null>(null);
+  const netME = round2(earnedME - spentME);
 
-  // ── Vice picker (progressive disclosure: trigger → category → vice) ─────
-  const [pickerOpen, setPickerOpen] = useState<boolean>(false);
-  const [openCat, setOpenCat] = useState<string>("drinks");
+  /** In-flight log celebration (confetti + floating delta). */
+  const [burst, setBurst] = useState<Burst | null>(null);
+
+  // ── Habit picker (same sheet pattern: trigger → category → genre/type) ──
+  const [habitPickerOpen, setHabitPickerOpen] = useState<boolean>(false);
+  const [openHabitCat, setOpenHabitCat] = useState<string>("workout");
 
   // ── Splash screen ───────────────────────────────────────────────────────
   const [splashFading, setSplashFading] = useState<boolean>(false);
@@ -306,106 +397,163 @@ export default function VicesAiPage() {
     return () => { clearTimeout(t1); clearTimeout(t2); };
   }, []);
 
-  // ── Persistence ─────────────────────────────────────────────────────────
+  // ── Persistence (ledger auto-resets every Monday — stale weeks are ignored) ──
+  //  `hydrated` gates the save effects until the load effects have run, so the
+  //  initial empty state never clobbers a balance stored on a previous visit.
+  const hydrated = useRef<boolean>(false);
   useEffect(() => {
     try {
       const raw = localStorage.getItem("vices-ledger-v2");
       if (raw) {
         const p = JSON.parse(raw);
-        setNetME(p.netME ?? 0);
-        setLastEntry(p.lastEntry ?? null);
+        if (p.week === weekOf()) {
+          if (typeof p.earned === "number") {
+            setEarnedME(p.earned);
+            setSpentME(p.spent ?? 0);
+          } else {
+            // Pre-split ledger stored only the net — recover what we can.
+            const n: number = p.netME ?? 0;
+            setEarnedME(Math.max(n, 0));
+            setSpentME(Math.max(-n, 0));
+          }
+          setLastEntry(p.lastEntry ?? null);
+        }
       }
     } catch { /* corrupted storage — start clean */ }
-  }, []);
-  useEffect(() => {
-    localStorage.setItem("vices-ledger-v2", JSON.stringify({ netME, lastEntry }));
-  }, [netME, lastEntry]);
-  useEffect(() => {
     try {
-      const raw = localStorage.getItem("vices-friends-v1");
-      if (raw) setFriends(JSON.parse(raw));
+      const raw = localStorage.getItem("vices-friends-v2");
+      if (raw) {
+        const p = JSON.parse(raw);
+        if (Array.isArray(p) && p.every((f) => typeof f.earned === "number")) setFriends(p);
+      }
     } catch { /* corrupted storage — keep seeds */ }
   }, []);
   useEffect(() => {
-    localStorage.setItem("vices-friends-v1", JSON.stringify(friends));
+    if (!hydrated.current) return;
+    localStorage.setItem("vices-ledger-v2", JSON.stringify({ week: weekOf(), earned: earnedME, spent: spentME, lastEntry }));
+  }, [earnedME, spentME, lastEntry]);
+  useEffect(() => {
+    if (!hydrated.current) return;
+    localStorage.setItem("vices-friends-v2", JSON.stringify(friends));
   }, [friends]);
+  // Declared last so it runs after the first pass of the save effects above —
+  // they skip while false, then persist normally once the loaded state lands.
+  useEffect(() => { hydrated.current = true; }, []);
 
   // ── Current selection + reactive math ───────────────────────────────────
-  const habit = HABITS.find((h) => h.id === habitId) as BarterItem<HabitId>;
-  const vice = ALL_VICES.find((v) => v.id === viceId) as BarterItem<ViceId>;
+  const habit = ALL_HABITS.find((h) => h.id === habitId) as BarterItem<HabitId>;
 
   const isAllowance = mode === "allowance";
-  const isDebt = mode === "debt";
-  const isTonight = mode === "tonight";
+  const isStore = mode === "store";
   const isFriends = mode === "friends";
 
-  const item = isDebt ? vice : habit;
-  const qty = isDebt ? viceQty : habitQty;
-  const setQty = isDebt ? setViceQty : setHabitQty;
+  // Allowance always works on the selected habit.
+  const item = habit;
+  const qty = habitQty;
+  const setQty = setHabitQty;
   const totalME = qty * item.me;
 
-  /** Tonight planner: split today's surplus evenly across the picks. */
-  const tonightBudget = Math.max(netME, 0);
-  const tonightGrid = useMemo(() => {
-    if (tonightPicks.length === 0) return [];
-    const share = tonightBudget / tonightPicks.length;
-    return tonightPicks.map((id) => {
-      const v = ALL_VICES.find((x) => x.id === id) as BarterItem<ViceId>;
-      return { ...v, count: share / v.me };
-    });
-  }, [tonightPicks, tonightBudget]);
+  /** Points available to spend in the Store (never negative on the banner). */
+  const wallet = Math.max(netME, 0);
 
-  const scenarios = buildScenarios(mode, habit, habitQty, vice, viceQty, netME, tonightPicks);
+  /** What the effort you're about to log buys — three single-vice maxes plus a
+   *  realistic mix. The headline "either 3 beers, 2 cigs, or 1 joint" answer. */
+  const spendSingles = useMemo(
+    () => (["beer", "cig", "joint"] as ViceId[]).map((id) => {
+      const v = viceBy(id);
+      return { v, n: buys(totalME, v.me) };
+    }),
+    [totalME],
+  );
+  const comboLine = comboFor(totalME);
 
-  /** Leaderboard: you + friends, ranked by moderation score. */
-  const board = useMemo(() => {
-    const rows: Friend[] = [
-      ...friends,
-      { name: "You", netME, last: lastEntry ?? "No logs yet", you: true },
+  /** Leaderboard: you + friends, ranked through the active metric's lens. */
+  const activeMetric = METRICS.find((m) => m.id === metric) as Metric;
+  const board = useMemo<Ranked[]>(() => {
+    const rows: Ranked[] = [
+      ...friends.map((f) => ({ ...f, net: round2(f.earned - f.spent) })),
+      { name: "You", earned: earnedME, spent: spentME, net: netME, last: lastEntry ?? "No logs yet", you: true },
     ];
-    return rows.sort((a, b) => moderation(b.netME) - moderation(a.netME));
-  }, [friends, netME, lastEntry]);
+    return rows.sort((a, b) => activeMetric.score(b) - activeMetric.score(a));
+  }, [friends, earnedME, spentME, netME, lastEntry, activeMetric]);
+
+  /** Podium columns rendered silver · gold · bronze; the rest go in rows. */
+  const podium = [board[1], board[0], board[2]];
+  const restRows = board.slice(3);
 
   const addFriend = (): void => {
     const name = newFriend.trim();
     if (!name || friends.some((f) => f.name.toLowerCase() === name.toLowerCase())) return;
-    setFriends((prev) => [...prev, { name, netME: 0, last: "No logs yet" }]);
+    setFriends((prev) => [...prev, { name, earned: 0, spent: 0, last: "No logs yet" }]);
     setNewFriend("");
   };
 
   // ── Life Balance status (three glowing-dot states) ──────────────────────
   const status =
-    netME > 0.25
+    netME > 2.5
       ? { label: "Vitality Surplus", dot: "bg-emerald-500", text: "text-emerald-600", glow: "shadow-[0_0_8px_rgba(16,185,129,0.5)]" }
-      : netME < -0.25
+      : netME < -2.5
       ? { label: "Karma Deficit",    dot: "bg-amber-400",   text: "text-amber-600",   glow: "shadow-[0_0_8px_rgba(251,191,36,0.5)]" }
       : { label: "Neutral Zone",     dot: "bg-stone-300",   text: "text-stone-500",   glow: "shadow-[0_0_8px_rgba(214,211,209,0.6)]" };
 
   // ── Actions ─────────────────────────────────────────────────────────────
-  const logEntry = (): void => {
-    const signed = isAllowance ? totalME : -totalME;
-    setNetME((prev) => Math.round((prev + signed) * 100) / 100);
-    setLastEntry(
-      `${item.label} · ${fmt(qty)} ${item.unit} · ${signed >= 0 ? "+" : ""}${fmt(signed)} mi · ${new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`,
-    );
+  /** Shower of particles off whatever just got tapped (green = earn, warm = spend). */
+  const fireBurst = (good: boolean): void => {
+    const palette = good ? CONFETTI_GOOD : CONFETTI_BAD;
+    const id = Date.now();
+    setBurst({
+      id,
+      parts: Array.from({ length: 14 }, (_, i) => ({
+        k: `${id}-${i}`,
+        dx: `${Math.round((Math.random() * 2 - 1) * 130)}px`,
+        dy: `${Math.round(-30 - Math.random() * 110)}px`,
+        c: palette[i % palette.length],
+        d: `${Math.round(Math.random() * 120)}ms`,
+      })),
+    });
+    window.setTimeout(() => setBurst((b) => (b && b.id === id ? null : b)), 950);
   };
 
-  const togglePick = (id: ViceId): void =>
-    setTonightPicks((prev) => (prev.includes(id) ? prev.filter((p) => p !== id) : [...prev, id]));
+  /** Allowance: bank points for a logged habit. */
+  const logEntry = (): void => {
+    setEarnedME((prev) => round2(prev + totalME));
+    setLastEntry(
+      `${item.label} · ${plur(qty, item.unitOne, item.unit)} · +${fmt(totalME)} pts · ${new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`,
+    );
+    fireBurst(true);
+  };
 
-  const selectVice = (id: ViceId): void => {
-    const next = ALL_VICES.find((v) => v.id === id);
-    if (next) { setViceId(next.id); setViceQty(next.def); }
-    setPickerOpen(false);
+  /** Store: spend points on a vice. Locked items (can't afford) no-op. */
+  const buyVice = (v: BarterItem<ViceId>): void => {
+    if (netME < v.me) return;
+    setSpentME((prev) => round2(prev + v.me));
+    setLastEntry(
+      `${v.label} · 1 ${v.unitOne} · -${fmt(v.me)} pts · ${new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`,
+    );
+    const id = Date.now();
+    setToast({ id, label: v.label, pts: v.me });
+    window.setTimeout(() => setToast((t) => (t && t.id === id ? null : t)), 1600);
+    fireBurst(false);
+  };
+
+  /** Pick a specific habit from the sheet → set it and close. */
+  const selectHabit = (h: BarterItem<HabitId>): void => {
+    setHabitId(h.id);
+    setHabitQty(h.def);
+    setHabitPickerOpen(false);
+  };
+
+  /** Open the habit sheet expanded on whatever category is active. */
+  const openHabitSheet = (): void => {
+    setOpenHabitCat(catOf(habitId));
+    setHabitPickerOpen(true);
   };
 
   // ── Mode-dependent accent classes (vibrant on eggshell) ─────────────────
   const accent = isAllowance
-    ? { text: "text-emerald-600", slider: "vslider-emerald", chip: "bg-emerald-500/10 border-emerald-500/40 text-emerald-700", btn: "bg-emerald-500 hover:bg-emerald-400 shadow-lg shadow-emerald-500/25" }
-    : isDebt
-    ? { text: "text-amber-600",   slider: "vslider-amber",   chip: "bg-amber-500/10 border-amber-500/40 text-amber-700",       btn: "bg-amber-500 hover:bg-amber-400 shadow-lg shadow-amber-500/25" }
-    : isTonight
-    ? { text: "text-sky-600",     slider: "vslider-sky",     chip: "bg-sky-500/10 border-sky-500/40 text-sky-700",             btn: "bg-sky-500 hover:bg-sky-400 shadow-lg shadow-sky-500/25" }
+    ? { text: "text-emerald-600", slider: "vslider-emerald", chip: "bg-emerald-500/10 border-emerald-500/40 text-emerald-700", btn: "bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 shadow-lg shadow-emerald-500/30" }
+    : isStore
+    ? { text: "text-rose-600",    slider: "vslider-amber",   chip: "bg-rose-500/10 border-rose-500/40 text-rose-700",          btn: "bg-gradient-to-r from-rose-500 to-amber-500 hover:from-rose-400 hover:to-amber-400 shadow-lg shadow-rose-500/30" }
     : { text: "text-stone-600",   slider: "vslider-sky",     chip: "bg-stone-900/10 border-stone-900/20 text-stone-700",       btn: "bg-stone-900 hover:bg-stone-700 shadow-lg shadow-stone-900/20" };
 
   const glass = "rounded-2xl border border-stone-900/10 bg-white/60 backdrop-blur-md shadow-sm";
@@ -415,7 +563,7 @@ export default function VicesAiPage() {
   // ══════════════════════════════════════════════════════════════════════
   return (
     <div className="relative min-h-dvh w-full bg-[#EDE9E1] font-sans text-stone-800 antialiased lg:flex lg:items-center lg:justify-center lg:p-8">
-      {/* Scoped styles: invisible scrollbars, slider thumbs, splash loader */}
+      {/* Scoped styles: scrollbars, sliders, splash loader, interaction FX */}
       <style>{`
         .no-scrollbar::-webkit-scrollbar { display: none; }
         .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
@@ -428,32 +576,47 @@ export default function VicesAiPage() {
         .vslider-amber::-moz-range-thumb { background: #f59e0b; }
         .vslider-sky::-webkit-slider-thumb { background: #0ea5e9; }
         .vslider-sky::-moz-range-thumb { background: #0ea5e9; }
+        .press { transition: transform .15s ease; }
+        .press:active { transform: scale(0.92); }
+        .shine { background-size: 200% auto; animation: shine 4s linear infinite; }
+        .floaty { background-size: 200% 200%; animation: floaty 14s ease infinite; }
         @keyframes loadbar { from { width: 0%; } to { width: 100%; } }
+        @keyframes fadeUp { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+        @keyframes pop { 0% { transform: scale(.82); } 60% { transform: scale(1.08); } 100% { transform: scale(1); } }
+        @keyframes bob { 0%, 100% { transform: translate(-50%, 0); } 50% { transform: translate(-50%, -4px); } }
+        @keyframes glowPulse { 0%, 100% { box-shadow: 0 0 16px var(--glow); } 50% { box-shadow: 0 0 36px var(--glow); } }
+        @keyframes burstP { 0% { transform: translate(-50%, -50%) scale(1); opacity: 1; } 100% { transform: translate(calc(-50% + var(--dx)), calc(-50% + var(--dy))) scale(.2); opacity: 0; } }
+        @keyframes shine { to { background-position: 200% center; } }
+        @keyframes floaty { 0%, 100% { background-position: 0% 50%; } 50% { background-position: 100% 50%; } }
+        @keyframes toastIn { 0% { opacity: 0; transform: translate(-50%, 16px) scale(.9); } 12% { opacity: 1; transform: translate(-50%, 0) scale(1); } 88% { opacity: 1; transform: translate(-50%, 0) scale(1); } 100% { opacity: 0; transform: translate(-50%, -8px) scale(.98); } }
       `}</style>
 
       {/* Desktop-only ambient backdrop behind the phone frame */}
-      <div className="pointer-events-none absolute inset-0 hidden lg:block bg-[radial-gradient(ellipse_at_top_left,#FFFFFF_0%,transparent_60%),radial-gradient(ellipse_at_bottom_right,#E0DACE_0%,transparent_60%)]" />
+      <div className="pointer-events-none absolute inset-0 hidden lg:block bg-[radial-gradient(ellipse_at_top_left,#FFFFFF_0%,transparent_55%),radial-gradient(ellipse_at_bottom_right,#D7F0E4_0%,transparent_55%),radial-gradient(ellipse_at_top_right,#FBE3D6_0%,transparent_50%)]" />
 
       {/* ─────────────── PHONE FRAME ───────────────
           Mobile: fills the native viewport edge-to-edge.
           Desktop: centered, cropped device mock-up with rounded bezel. */}
-      <div className="relative h-dvh w-full overflow-hidden bg-gradient-to-b from-[#FAF8F4] to-[#F1EDE5] lg:h-[780px] lg:max-h-[92vh] lg:w-[390px] lg:rounded-[40px] lg:border lg:border-stone-700/60 lg:ring-8 lg:ring-stone-900 lg:shadow-[0_40px_120px_-20px_rgba(28,25,23,0.5)]">
+      <div className="relative h-dvh w-full overflow-hidden bg-gradient-to-b from-[#FAF8F4] to-[#F1EDE5] lg:h-[920px] lg:max-h-[96vh] lg:w-[460px] lg:rounded-[52px] lg:border lg:border-stone-700/60 lg:ring-[10px] lg:ring-stone-900 lg:shadow-[0_50px_140px_-20px_rgba(28,25,23,0.55)]">
+
+        {/* Soft animated mesh wash on the screen itself — keeps it from feeling flat */}
+        <div className="floaty pointer-events-none absolute inset-0 opacity-70 bg-[radial-gradient(circle_at_15%_10%,rgba(16,185,129,0.10),transparent_45%),radial-gradient(circle_at_85%_15%,rgba(244,63,94,0.08),transparent_45%),radial-gradient(circle_at_50%_100%,rgba(14,165,233,0.08),transparent_50%)]" />
 
         {/* Notch — desktop mock-up only */}
-        <div className="absolute left-1/2 top-3 z-40 hidden h-6 w-28 -translate-x-1/2 rounded-full bg-stone-900 lg:block" />
+        <div className="absolute left-1/2 top-3.5 z-40 hidden h-7 w-32 -translate-x-1/2 rounded-full bg-stone-900 lg:block" />
 
         {/* ─────────────── SPLASH / LOADING SCREEN ─────────────── */}
         {!splashGone && (
           <div className={`absolute inset-0 z-50 flex flex-col items-center justify-center bg-[#FAF8F4] transition-opacity duration-700 ${splashFading ? "opacity-0" : "opacity-100"}`}>
-            <div className="flex h-20 w-20 items-center justify-center rounded-3xl bg-stone-900 shadow-xl shadow-stone-900/25">
+            <div className="flex h-20 w-20 items-center justify-center rounded-3xl bg-gradient-to-br from-stone-900 to-stone-700 shadow-xl shadow-stone-900/25" style={{ animation: "pop .5s ease" }}>
               <Scale className="h-9 w-9 text-[#FAF8F4]" />
             </div>
             <h1 className="mt-6 text-4xl font-black tracking-tight text-stone-900">
-              Vices<span className="text-emerald-500">.ai</span>
+              Vices<span className="shine bg-gradient-to-r from-emerald-500 via-teal-400 to-emerald-500 bg-clip-text text-transparent">.ai</span>
             </h1>
             <p className="mt-2 text-sm text-stone-500">Earn your vices the easy way.</p>
             <div className="mt-8 h-1 w-40 overflow-hidden rounded-full bg-stone-900/10">
-              <div className="h-full rounded-full bg-emerald-500" style={{ animation: "loadbar 2.2s ease-out forwards" }} />
+              <div className="h-full rounded-full bg-gradient-to-r from-emerald-500 to-teal-400" style={{ animation: "loadbar 2.2s ease-out forwards" }} />
             </div>
           </div>
         )}
@@ -461,36 +624,38 @@ export default function VicesAiPage() {
         {/* ─────────────── SINGLE-SCREEN APP SHELL (zero scroll) ─────────────── */}
         <div className="flex h-full flex-col justify-between gap-3 overflow-hidden p-6 lg:pt-12">
 
-          {/* ── HEADER: brand + Life Balance status ── */}
+          {/* ── HEADER: brand + live balance pill ── */}
           <header className="flex flex-shrink-0 items-start justify-between">
             <div className="flex items-center gap-2.5">
               <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-stone-900 shadow-md shadow-stone-900/20">
                 <Scale className="h-4 w-4 text-[#FAF8F4]" />
               </div>
-              <div>
-                <h1 className="text-base font-bold leading-none tracking-tight text-stone-900">
-                  Vices<span className="text-emerald-500">.ai</span>
-                </h1>
-                <p className="mt-1 text-[8px] uppercase tracking-[0.18em] text-stone-400">Earn your vices the easy way</p>
-              </div>
+              <h1 className="text-lg font-bold leading-none tracking-tight text-stone-900">
+                Vices<span className="text-emerald-500">.ai</span>
+              </h1>
             </div>
             <div className="flex flex-col items-end gap-1">
               <span className="text-[8px] font-semibold uppercase tracking-[0.2em] text-stone-400">Life Balance</span>
               <div className="flex items-center gap-1.5 rounded-full border border-stone-900/10 bg-white/70 px-2.5 py-1">
                 <span className={`h-1.5 w-1.5 animate-pulse rounded-full ${status.dot} ${status.glow}`} />
                 <span className={`text-[10px] font-semibold ${status.text}`}>{status.label}</span>
+                <span className={`text-[11px] font-black tabular-nums ${status.text}`}>
+                  {netME >= 0 ? "+" : ""}{fmt(netME)} pts
+                </span>
               </div>
+              <span className="text-[7px] font-semibold uppercase tracking-[0.2em] text-stone-400/80">resets every monday</span>
             </div>
           </header>
 
           {/* ── MAIN PANEL (the only region allowed to flex) ── */}
-          <main className={`no-scrollbar min-h-0 flex-1 overflow-y-auto ${glass} flex flex-col gap-4 p-5`}>
+          <main className={`no-scrollbar min-h-0 flex-1 overflow-y-auto ${glass} p-5`}>
+            <div className="flex min-h-full flex-col gap-4">
             {isFriends ? (
               <>
-                {/* Balance Board: who's keeping it the most level */}
+                {/* Leaderboard: one squad, four ways to judge it */}
                 <div>
-                  <h2 className={`text-xs font-bold uppercase tracking-[0.18em] ${accent.text}`}>Balance Board</h2>
-                  <p className="mt-1 text-[11px] italic text-stone-400">Moderation in all things.</p>
+                  <h2 className={`text-xs font-bold uppercase tracking-[0.18em] ${accent.text}`}>Leaderboard</h2>
+                  <p className="mt-1 text-[11px] italic text-stone-400">Your circle, ranked. Pick the lens.</p>
                 </div>
                 <div className="flex gap-2">
                   <input
@@ -502,118 +667,177 @@ export default function VicesAiPage() {
                   />
                   <button
                     onClick={addFriend}
-                    className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl bg-stone-900 text-[#FAF8F4] transition-colors hover:bg-stone-700"
+                    className="press flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl bg-stone-900 text-[#FAF8F4] transition-colors hover:bg-stone-700"
                     aria-label="Add friend"
                   >
                     <UserPlus className="h-4 w-4" />
                   </button>
                 </div>
-                <div className="flex flex-col gap-2">
-                  {board.map((f, i) => (
+
+                {/* Metric lenses */}
+                <div className="grid grid-cols-3 gap-1.5">
+                  {METRICS.map((m) => {
+                    const on = metric === m.id;
+                    return (
+                      <button
+                        key={m.id}
+                        onClick={() => setMetric(m.id)}
+                        className={`press flex flex-col items-center gap-1 rounded-xl border py-2 transition-colors ${on ? m.chipOn : "border-stone-900/10 bg-white/40 text-stone-400 hover:text-stone-600"}`}
+                        style={on ? { animation: "pop .3s ease" } : undefined}
+                      >
+                        {m.icon}
+                        <span className="text-[9px] font-bold">{m.label}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+
+                {/* Re-keyed by metric so every switch replays the entrances */}
+                <div key={metric} className="flex flex-col gap-2">
+                  <p className="text-[10px] italic leading-relaxed text-stone-400" style={{ animation: "fadeUp .3s ease" }}>
+                    {activeMetric.tagline}
+                  </p>
+
+                  {/* Podium: silver · gold · bronze */}
+                  <div className="grid grid-cols-3 items-end gap-2">
+                    {podium.map((f, ci) => {
+                      if (!f) return <div key={ci} />;
+                      const first = ci === 1;
+                      const rank = first ? 1 : ci === 0 ? 2 : 3;
+                      return (
+                        <div
+                          key={f.name}
+                          className={`relative flex flex-col items-center gap-0.5 rounded-2xl border px-1.5 text-center ${first ? "border-stone-900/15 bg-white pb-3.5 pt-5 shadow-xl" : "border-stone-900/10 bg-white/60 py-3"} ${f.you ? "ring-2 ring-stone-900/25" : ""}`}
+                          style={
+                            first
+                              ? ({ "--glow": activeMetric.glow, animation: "fadeUp .45s ease both, glowPulse 2.4s ease-in-out .45s infinite" } as React.CSSProperties)
+                              : { animation: `fadeUp .4s ease ${ci * 80}ms both` }
+                          }
+                        >
+                          {first && (
+                            <Crown className="absolute -top-3 left-1/2 h-5 w-5 text-amber-500" style={{ animation: "bob 1.6s ease-in-out infinite" }} />
+                          )}
+                          <span className="flex h-5 w-5 items-center justify-center rounded-full bg-stone-900 text-[9px] font-black text-white">{rank}</span>
+                          <p className="w-full truncate text-[11px] font-bold text-stone-900">{f.name}</p>
+                          <p className={`text-lg font-black leading-none tabular-nums ${activeMetric.text}`}>{fmt(activeMetric.score(f))}</p>
+                          <p className="text-[7px] uppercase tracking-wider text-stone-400">{activeMetric.unit}</p>
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  {/* Everyone off the podium */}
+                  {restRows.map((f, i) => (
                     <div
                       key={f.name}
                       className={`flex items-center gap-3 rounded-xl border px-3.5 py-2.5 ${f.you ? "border-stone-900/30 bg-white shadow-sm" : "border-stone-900/10 bg-white/50"}`}
+                      style={{ animation: `fadeUp .35s ease ${200 + i * 70}ms both` }}
                     >
-                      <span className="w-4 flex-shrink-0 text-xs font-bold tabular-nums text-stone-400">{i + 1}</span>
+                      <span className="w-4 flex-shrink-0 text-xs font-bold tabular-nums text-stone-400">{i + 4}</span>
                       <div className="min-w-0 flex-1">
                         <p className="text-[13px] font-semibold text-stone-900">{f.name}</p>
                         <p className="truncate text-[10px] text-stone-400">{f.last}</p>
                       </div>
                       <div className="flex-shrink-0 text-right">
-                        <p className="text-base font-bold leading-none tabular-nums text-stone-900">{moderation(f.netME)}</p>
-                        <p className="mt-0.5 text-[8px] uppercase tracking-wider text-stone-400">balance</p>
+                        <p className={`text-base font-bold leading-none tabular-nums ${activeMetric.text}`}>{fmt(activeMetric.score(f))}</p>
+                        <p className="mt-0.5 text-[8px] uppercase tracking-wider text-stone-400">{activeMetric.unit}</p>
                       </div>
-                      <span className={`h-1.5 w-1.5 flex-shrink-0 rounded-full ${dotFor(f.netME)}`} />
+                      <span className={`h-1.5 w-1.5 flex-shrink-0 rounded-full ${dotFor(f.net)}`} />
                     </div>
                   ))}
                 </div>
-                <p className="text-[10px] leading-relaxed text-stone-400">
-                  Closest to even wins — too much of anything, good or bad, costs points.
-                </p>
               </>
-            ) : isTonight ? (
+            ) : isStore ? (
               <>
-                {/* Tonight planner: multi-select, then split the surplus */}
-                <h2 className={`text-xs font-bold uppercase tracking-[0.18em] ${accent.text}`}>Tonight&apos;s Plan</h2>
-                <div className="flex flex-wrap gap-1.5">
-                  {TONIGHT_IDS.map((id) => {
-                    const v = ALL_VICES.find((x) => x.id === id) as BarterItem<ViceId>;
-                    const on = tonightPicks.includes(id);
-                    return (
-                      <button
-                        key={id}
-                        onClick={() => togglePick(id)}
-                        className={`flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-[11px] font-medium transition-colors ${on ? accent.chip : "border-stone-900/10 bg-white/40 text-stone-400 hover:text-stone-600"}`}
-                      >
-                        {v.icon}
-                        {v.label}
-                      </button>
-                    );
-                  })}
-                </div>
-                <div className="flex items-center gap-2.5 rounded-xl border border-stone-900/10 bg-white/40 px-3.5 py-2.5">
-                  <Moon className={`h-4 w-4 flex-shrink-0 ${accent.text}`} />
-                  <p className="text-[11px] leading-relaxed text-stone-500">
-                    Tonight&apos;s budget: <span className={`font-bold ${accent.text}`}>{fmt(tonightBudget)} run-miles</span> — earned from today&apos;s logged exercise.
-                  </p>
-                </div>
-                {tonightGrid.length > 0 && tonightBudget > 0 ? (
-                  <div className="grid grid-cols-2 gap-2">
-                    {tonightGrid.map((g) => (
-                      <div key={g.id} className="flex items-center gap-2.5 rounded-xl border border-stone-900/10 bg-white/40 px-3 py-2.5">
-                        <span className={accent.text}>{g.icon}</span>
-                        <div className="min-w-0">
-                          <p className="text-base font-bold leading-none tabular-nums text-stone-900">{fmt(g.count)}</p>
-                          <p className="mt-0.5 truncate text-[9px] uppercase tracking-wider text-stone-400">{g.plural}</p>
-                        </div>
-                      </div>
-                    ))}
+                {/* ── VICES STORE: spend your hard-earned points ── */}
+                <h2 className={`text-xs font-bold uppercase tracking-[0.18em] ${accent.text}`}>Vices Store</h2>
+
+                {/* Wallet banner — live spendable balance, doubles as the burst origin */}
+                <div className="relative flex flex-shrink-0 items-center gap-3 overflow-hidden rounded-2xl bg-gradient-to-br from-rose-500 to-amber-500 px-4 py-3.5 text-white shadow-lg shadow-rose-500/25">
+                  {burst && (
+                    <div className="pointer-events-none absolute inset-0 z-10">
+                      {burst.parts.map((p) => (
+                        <span
+                          key={p.k}
+                          className="absolute left-1/2 top-1/2 h-2 w-2 rounded-full"
+                          style={{ background: p.c, animation: `burstP .8s ease-out ${p.d} both`, "--dx": p.dx, "--dy": p.dy } as React.CSSProperties}
+                        />
+                      ))}
+                    </div>
+                  )}
+                  <Wallet className="h-6 w-6 flex-shrink-0" />
+                  <div className="flex-1">
+                    <p className="text-[9px] font-semibold uppercase tracking-[0.18em] text-white/80">Points to spend</p>
+                    <p key={wallet} className="text-2xl font-black leading-none tabular-nums" style={{ animation: "pop .25s ease" }}>{fmt(wallet)} pts</p>
                   </div>
-                ) : (
-                  <p className="text-[11px] italic text-stone-400">
-                    {tonightPicks.length === 0 ? "Nothing selected yet." : "No surplus to spend — log exercise in Allowance first."}
-                  </p>
-                )}
+                  <ShoppingBag className="h-5 w-5 flex-shrink-0 text-white/70" />
+                </div>
+
+                {/* Catalogue — tap an affordable item to buy it, locked ones show the gap */}
+                <div className="flex flex-col gap-3">
+                  {VICE_CATEGORIES.map((cat) => (
+                    <div key={cat.id}>
+                      <div className="mb-1.5 flex items-center gap-1.5 text-stone-500">
+                        <span className={accent.text}>{cat.icon}</span>
+                        <span className="text-[10px] font-bold uppercase tracking-[0.18em]">{cat.label}</span>
+                      </div>
+                      <div className="grid grid-cols-2 gap-2">
+                        {cat.vices.map((v, vi) => {
+                          const afford = netME >= v.me;
+                          return (
+                            <button
+                              key={v.id}
+                              onClick={() => buyVice(v)}
+                              disabled={!afford}
+                              style={{ animation: `fadeUp .25s ease ${vi * 30}ms both` }}
+                              className={`press relative flex items-center gap-2.5 rounded-xl border px-3 py-2.5 text-left transition-all ${afford ? "border-stone-900/10 bg-white/70 hover:bg-white hover:shadow-md" : "border-stone-900/5 bg-white/30 opacity-70"}`}
+                            >
+                              <span className={`flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg ${afford ? "bg-rose-500/10 text-rose-600" : "bg-stone-900/5 text-stone-400"}`}>
+                                {afford ? v.icon : <Lock className="h-3.5 w-3.5" />}
+                              </span>
+                              <span className="min-w-0 flex-1">
+                                <span className="block truncate text-[12px] font-semibold text-stone-800">{v.label}</span>
+                                <span className={`block text-[10px] font-bold tabular-nums ${afford ? "text-rose-600" : "text-stone-400"}`}>
+                                  {afford ? `${fmt(v.me)} pts` : `need ${fmt(v.me - netME)} more`}
+                                </span>
+                              </span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  ))}
+                </div>
               </>
             ) : (
               <>
-                {/* Allowance / Debt: one item, one slider, one log button */}
-                <h2 className={`text-xs font-bold uppercase tracking-[0.18em] ${accent.text}`}>
-                  {isAllowance ? "Earned Allowance" : "Debt Recovery"}
-                </h2>
+                {/* ── EARNED ALLOWANCE: pick → set amount → log. One clean flow. ── */}
+                <h2 className={`text-xs font-bold uppercase tracking-[0.18em] ${accent.text}`}>Earned Allowance</h2>
 
-                {isAllowance ? (
-                  /* Habits are few enough for a flat chip row */
-                  <div className="grid grid-cols-4 gap-2">
-                    {HABITS.map((h) => (
-                      <button
-                        key={h.id}
-                        onClick={() => { setHabitId(h.id); setHabitQty(h.def); }}
-                        className={`flex flex-col items-center gap-1.5 rounded-xl border py-2.5 transition-colors ${habitId === h.id ? accent.chip : "border-stone-900/10 bg-white/40 text-stone-400 hover:text-stone-600"}`}
-                      >
-                        {h.icon}
-                        <span className="text-[9px] font-semibold">{h.short}</span>
-                      </button>
-                    ))}
-                  </div>
-                ) : (
-                  /* Vices are many — progressive disclosure via category picker */
-                  <button
-                    onClick={() => setPickerOpen(true)}
-                    className="flex w-full items-center gap-3 rounded-xl border border-stone-900/10 bg-white/40 px-4 py-3 transition-colors hover:bg-white/80"
-                  >
-                    <span className={accent.text}>{vice.icon}</span>
-                    <span className="flex-1 text-left text-sm font-medium text-stone-800">{vice.label}</span>
-                    <span className="text-[10px] text-stone-400">{fmt(vice.me)} mi each</span>
-                    <ChevronDown className="h-4 w-4 text-stone-400" />
-                  </button>
-                )}
+                {/* Activity selector — opens the habit bottom-sheet */}
+                <button
+                  onClick={openHabitSheet}
+                  className="press flex w-full items-center gap-3 rounded-2xl border border-stone-900/10 bg-white/70 px-4 py-3.5 text-left shadow-sm transition-colors hover:bg-white"
+                >
+                  <span className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl bg-emerald-500/10 text-emerald-600">
+                    {item.icon}
+                  </span>
+                  <span className="min-w-0 flex-1">
+                    <span className="block text-[9px] font-semibold uppercase tracking-[0.18em] text-stone-400">Activity</span>
+                    <span className="block truncate text-sm font-bold text-stone-900">{item.label}</span>
+                  </span>
+                  <span className="flex-shrink-0 text-[10px] tabular-nums text-stone-400">{fmt(item.me)} pts each</span>
+                  <ChevronDown className="h-4 w-4 flex-shrink-0 text-stone-400" />
+                </button>
 
-                {/* Quantity slider */}
-                <div>
-                  <div className="mb-2 flex items-center justify-between">
-                    <label className="text-[10px] font-semibold uppercase tracking-[0.2em] text-stone-400">Quantity</label>
-                    <span className={`text-sm font-bold tabular-nums ${accent.text}`}>{fmt(qty)} {item.unit}</span>
+                {/* Quantity — hero number + slider */}
+                <div className="rounded-2xl border border-stone-900/10 bg-white/40 p-4">
+                  <div className="flex items-end justify-between">
+                    <span className="text-[9px] font-semibold uppercase tracking-[0.18em] text-stone-400">How many</span>
+                    <span className={`flex items-baseline gap-1.5 font-black tabular-nums ${accent.text}`}>
+                      <span key={qty} className="text-3xl leading-none" style={{ animation: "pop .2s ease" }}>{fmt(qty)}</span>
+                      <span className="text-xs font-semibold text-stone-400">{qty === 1 ? item.unitOne : item.unit}</span>
+                    </span>
                   </div>
                   <input
                     type="range"
@@ -622,67 +846,64 @@ export default function VicesAiPage() {
                     step={item.step}
                     value={qty}
                     onChange={(e) => setQty(Number(e.target.value))}
-                    className={`vslider ${accent.slider}`}
+                    className={`vslider ${accent.slider} mt-3.5`}
                   />
-                  <div className="mt-1 flex justify-between text-[10px] text-stone-400">
-                    <span>{item.min}</span>
-                    <span>{item.max}</span>
-                  </div>
                 </div>
 
-                {/* Live readout */}
-                <div className="flex items-center gap-2.5 rounded-xl border border-stone-900/10 bg-white/40 px-3.5 py-2.5">
-                  <Sparkles className={`h-4 w-4 flex-shrink-0 ${accent.text}`} />
-                  <p className="text-[11px] leading-relaxed text-stone-500">
-                    {isAllowance
-                      ? <>Banking <span className={`font-bold ${accent.text}`}>{fmt(totalME)} run-miles</span> — that&apos;s {fmt(totalME)} beers of headroom.</>
-                      : <>This costs <span className={`font-bold ${accent.text}`}>{fmt(totalME)} run-miles</span> of payback.</>}
+                {/* What that effort buys */}
+                <div className="rounded-2xl border border-stone-900/10 bg-white/40 p-4">
+                  <p className="text-[9px] font-semibold uppercase tracking-[0.18em] text-stone-400">That effort buys — take your pick</p>
+                  <div className="mt-3 grid grid-cols-3 gap-2">
+                    {spendSingles.map(({ v, n }, i) => (
+                      <div
+                        key={v.id}
+                        className="flex flex-col items-center gap-1 rounded-xl border border-stone-900/10 bg-white/60 py-2.5"
+                        style={{ animation: `fadeUp .25s ease ${i * 50}ms both` }}
+                      >
+                        <span className={accent.text}>{v.icon}</span>
+                        <span className="text-xl font-black leading-none tabular-nums text-stone-900">{n}</span>
+                        <span className="text-[8px] uppercase tracking-wider text-stone-400">{n === 1 ? v.unitOne : v.unit}</span>
+                      </div>
+                    ))}
+                  </div>
+                  <p className="mt-3 border-t border-stone-900/5 pt-2.5 text-[11px] text-stone-500">
+                    or mix it: <span className={`font-bold ${accent.text}`}>{comboLine}</span>
                   </p>
                 </div>
 
-                <button
-                  onClick={logEntry}
-                  className={`mt-auto w-full rounded-xl py-3.5 text-sm font-bold text-white transition-all active:scale-[0.98] ${accent.btn}`}
-                >
-                  Log to Ledger
-                </button>
+                {/* Slim weekly context pinned to the bottom */}
+                <div className="mt-auto flex flex-shrink-0 items-center justify-between px-1 text-[10px] text-stone-400">
+                  <span className="font-semibold uppercase tracking-[0.18em]">This week</span>
+                  <span className="tabular-nums">
+                    <span className="font-bold text-emerald-600">+{fmt(earnedME)}</span> earned&nbsp;·&nbsp;
+                    <span className="font-bold text-amber-600">−{fmt(spentME)}</span> spent
+                  </span>
+                </div>
+
+                {/* Log button with confetti burst on click */}
+                <div className="relative flex-shrink-0">
+                  {burst && (
+                    <div className="pointer-events-none absolute inset-x-0 -top-2 bottom-0 z-10">
+                      {burst.parts.map((p) => (
+                        <span
+                          key={p.k}
+                          className="absolute left-1/2 top-1/2 h-2 w-2 rounded-full"
+                          style={{ background: p.c, animation: `burstP .8s ease-out ${p.d} both`, "--dx": p.dx, "--dy": p.dy } as React.CSSProperties}
+                        />
+                      ))}
+                    </div>
+                  )}
+                  <button
+                    onClick={logEntry}
+                    className={`press w-full rounded-2xl py-4 text-sm font-bold text-white ${accent.btn}`}
+                  >
+                    Log {item.label}
+                  </button>
+                </div>
               </>
             )}
+            </div>
           </main>
-
-          {/* ── VIBE LEDGER: one-number balance + last entry + reset ── */}
-          <div className={`${glass} flex flex-shrink-0 items-center gap-3 px-4 py-3`}>
-            <div className="flex-shrink-0">
-              <p className="text-[8px] font-semibold uppercase tracking-[0.2em] text-stone-400">Vibe Ledger</p>
-              <p className={`text-xl font-bold tabular-nums leading-tight ${netME > 0.25 ? "text-emerald-600" : netME < -0.25 ? "text-amber-600" : "text-stone-500"}`}>
-                {netME >= 0 ? "+" : ""}{fmt(netME)} mi
-              </p>
-            </div>
-            <p className="min-w-0 flex-1 truncate text-right text-[10px] text-stone-400">
-              {lastEntry ?? "Slate is clean — log something."}
-            </p>
-            <button
-              onClick={() => { setNetME(0); setLastEntry(null); }}
-              className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full border border-stone-900/10 bg-white/50 text-stone-400 transition-colors hover:text-stone-700"
-              aria-label="Reset ledger"
-            >
-              <RotateCcw className="h-3.5 w-3.5" />
-            </button>
-          </div>
-
-          {/* ── DYNAMIC SCENARIO CARDS (hidden in modes with none) ── */}
-          {scenarios.length > 0 && (
-            <div className="grid flex-shrink-0 grid-cols-2 gap-2.5">
-              {scenarios.map((s) => (
-                <div key={s.q} className={`${glass} px-3.5 py-3`}>
-                  <p className="text-[10px] font-semibold leading-snug text-stone-500">{s.q}</p>
-                  <p className={`mt-1.5 text-[11px] font-bold leading-snug ${s.tone === "good" ? "text-emerald-600" : s.tone === "bad" ? "text-amber-600" : "text-sky-600"}`}>
-                    {s.a}
-                  </p>
-                </div>
-              ))}
-            </div>
-          )}
 
           {/* ── BOTTOM TAB BAR ── */}
           <nav className="flex flex-shrink-0 rounded-2xl border border-stone-900/10 bg-stone-900/5 p-1">
@@ -690,53 +911,77 @@ export default function VicesAiPage() {
               <button
                 key={id}
                 onClick={() => setMode(id)}
-                className={`flex flex-1 flex-col items-center gap-1 rounded-xl py-2 transition-colors ${mode === id ? "bg-white text-stone-900 shadow-sm" : "text-stone-400 hover:text-stone-600"}`}
+                className={`press flex flex-1 flex-col items-center gap-1 rounded-xl py-2 transition-colors ${mode === id ? "bg-white text-stone-900 shadow-sm" : "text-stone-400 hover:text-stone-600"}`}
               >
-                {icon}
+                <span style={mode === id ? { animation: "pop .3s ease" } : undefined}>{icon}</span>
                 <span className="text-[9px] font-semibold">{label}</span>
               </button>
             ))}
           </nav>
         </div>
 
-        {/* ─────────────── CATEGORIZED VICE PICKER (bottom sheet) ─────────────── */}
-        {pickerOpen && (
+        {/* ─────────────── PURCHASE TOAST (store) ─────────────── */}
+        {toast && (
+          <div
+            key={toast.id}
+            className="pointer-events-none absolute bottom-24 left-1/2 z-40 flex -translate-x-1/2 items-center gap-2 rounded-full bg-stone-900 px-4 py-2 text-white shadow-xl shadow-stone-900/30"
+            style={{ animation: "toastIn 1.6s ease forwards" }}
+          >
+            <ShoppingBag className="h-3.5 w-3.5 text-rose-300" />
+            <span className="text-[12px] font-semibold">Enjoy your {toast.label.toLowerCase()}</span>
+            <span className="text-[12px] font-black tabular-nums text-rose-300">−{fmt(toast.pts)} pts</span>
+          </div>
+        )}
+
+        {/* ─────────────── CATEGORIZED HABIT PICKER (bottom sheet) ─────────────── */}
+        {habitPickerOpen && (
           <div className="absolute inset-0 z-30">
-            <div className="absolute inset-0 bg-stone-900/30 backdrop-blur-sm" onClick={() => setPickerOpen(false)} />
-            <div className="no-scrollbar absolute inset-x-0 bottom-0 max-h-[75%] overflow-y-auto rounded-t-3xl border-t border-stone-900/10 bg-[#FAF8F4]/95 p-5 backdrop-blur-xl">
+            <div className="absolute inset-0 bg-stone-900/30 backdrop-blur-sm" onClick={() => setHabitPickerOpen(false)} />
+            <div className="no-scrollbar absolute inset-x-0 bottom-0 max-h-[75%] overflow-y-auto rounded-t-3xl border-t border-stone-900/10 bg-[#FAF8F4]/95 p-5 backdrop-blur-xl" style={{ animation: "fadeUp .3s ease" }}>
               <div className="mx-auto mb-4 h-1 w-10 rounded-full bg-stone-900/15" />
-              <h3 className="mb-3 text-xs font-bold uppercase tracking-[0.18em] text-stone-500">Pick your indulgence</h3>
+              <h3 className="mb-3 text-xs font-bold uppercase tracking-[0.18em] text-stone-500">What did you do?</h3>
               <div className="space-y-2">
-                {VICE_CATEGORIES.map((cat) => (
-                  <div key={cat.id} className="overflow-hidden rounded-xl border border-stone-900/10 bg-white/60">
-                    {/* Category row — first level of disclosure */}
-                    <button
-                      onClick={() => setOpenCat(openCat === cat.id ? "" : cat.id)}
-                      className="flex w-full items-center gap-3 px-4 py-3 transition-colors hover:bg-stone-900/5"
-                    >
-                      <span className="text-amber-600">{cat.icon}</span>
-                      <span className="flex-1 text-left text-sm font-semibold text-stone-800">{cat.label}</span>
-                      <ChevronDown className={`h-4 w-4 text-stone-400 transition-transform duration-200 ${openCat === cat.id ? "rotate-180" : ""}`} />
-                    </button>
-                    {/* Vice rows — second level, shown only for the open category */}
-                    {openCat === cat.id && (
-                      <div className="border-t border-stone-900/5">
-                        {cat.vices.map((v) => (
-                          <button
-                            key={v.id}
-                            onClick={() => selectVice(v.id)}
-                            className="flex w-full items-center gap-3 px-4 py-2.5 transition-colors hover:bg-stone-900/5"
-                          >
-                            <span className="text-stone-400">{v.icon}</span>
-                            <span className="flex-1 text-left text-[13px] text-stone-700">{v.label}</span>
-                            <span className="text-[10px] text-stone-400">{fmt(v.me)} mi</span>
-                            {viceId === v.id && <Check className="h-3.5 w-3.5 text-emerald-600" />}
-                          </button>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                ))}
+                {HABIT_CATS.map((cat) => {
+                  // Single-option categories (Water, Cold) select straight from the row.
+                  const single = cat.options.length === 1;
+                  const open = openHabitCat === cat.id;
+                  return (
+                    <div key={cat.id} className="overflow-hidden rounded-xl border border-stone-900/10 bg-white/60">
+                      <button
+                        onClick={() => (single ? selectHabit(cat.options[0]) : setOpenHabitCat(open ? "" : cat.id))}
+                        className="press flex w-full items-center gap-3 px-4 py-3 transition-colors hover:bg-stone-900/5"
+                      >
+                        <span className="text-emerald-600">{cat.icon}</span>
+                        <span className="flex-1 text-left text-sm font-semibold text-stone-800">{cat.label}</span>
+                        {single ? (
+                          <>
+                            <span className="text-[10px] text-stone-400">{fmt(cat.options[0].me)} pts</span>
+                            {habitId === cat.options[0].id && <Check className="h-3.5 w-3.5 text-emerald-600" />}
+                          </>
+                        ) : (
+                          <ChevronDown className={`h-4 w-4 text-stone-400 transition-transform duration-200 ${open ? "rotate-180" : ""}`} />
+                        )}
+                      </button>
+                      {!single && open && (
+                        <div className="border-t border-stone-900/5">
+                          {cat.options.map((h, hi) => (
+                            <button
+                              key={h.id}
+                              onClick={() => selectHabit(h)}
+                              className="press flex w-full items-center gap-3 px-4 py-2.5 transition-colors hover:bg-stone-900/5"
+                              style={{ animation: `fadeUp .25s ease ${hi * 40}ms both` }}
+                            >
+                              <span className="text-stone-400">{h.icon}</span>
+                              <span className="flex-1 text-left text-[13px] text-stone-700">{h.label}</span>
+                              <span className="text-[10px] text-stone-400">{fmt(h.me)} pts</span>
+                              {habitId === h.id && <Check className="h-3.5 w-3.5 text-emerald-600" />}
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
             </div>
           </div>
