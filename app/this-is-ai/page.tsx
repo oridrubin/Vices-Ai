@@ -388,14 +388,6 @@ const greeting = (): string => {
   return h < 5 ? "Late night" : h < 12 ? "Good morning" : h < 18 ? "Good afternoon" : "Good evening";
 };
 
-/** One-tap "quick add" habits on the Earn page — MyFitnessPal-style fast entry. */
-const QUICK_LOG: { id: HabitId; qty: number }[] = [
-  { id: "run",   qty: 1 },
-  { id: "lift",  qty: 1 },
-  { id: "sauna", qty: 1 },
-  { id: "salad", qty: 1 },
-];
-
 /** First-run onboarding — four quick cards, skippable at any point. */
 const ONBOARD: { icon: React.ReactNode; title: string; body: string }[] = [
   { icon: <Scale className="h-7 w-7" />,       title: "Welcome to Vices.ai", body: "Do healthy things, bank points, then spend them on your vices — guilt-free." },
@@ -686,6 +678,32 @@ export default function VicesAiPage() {
     try { localStorage.setItem("vices-onboarded-v1", "1"); } catch { /* ignore */ }
   };
 
+  // ── Swipe between tabs (touch) ──────────────────────────────────────────
+  //  A horizontal flick moves to the next/previous tab. Regions marked
+  //  data-noswipe (the slider, the "For You" carousel) keep their own gesture.
+  const swipeX = useRef<number | null>(null);
+  const swipeY = useRef<number | null>(null);
+  const onTouchStart = (e: React.TouchEvent): void => {
+    if (habitPickerOpen || onboardStep >= 0 || (e.target as HTMLElement).closest("[data-noswipe]")) {
+      swipeX.current = null;
+      return;
+    }
+    swipeX.current = e.touches[0].clientX;
+    swipeY.current = e.touches[0].clientY;
+  };
+  const onTouchEnd = (e: React.TouchEvent): void => {
+    if (swipeX.current === null) return;
+    const dx = e.changedTouches[0].clientX - swipeX.current;
+    const dy = e.changedTouches[0].clientY - (swipeY.current ?? 0);
+    swipeX.current = null;
+    // Only a clear, mostly-horizontal flick counts.
+    if (Math.abs(dx) < 55 || Math.abs(dx) < Math.abs(dy) * 1.4) return;
+    const order = TABS.map((t) => t.id);
+    const i = order.indexOf(mode);
+    if (dx < 0 && i < order.length - 1) setMode(order[i + 1]);
+    else if (dx > 0 && i > 0) setMode(order[i - 1]);
+  };
+
   /** Store: spend points on a vice. Locked items (can't afford) no-op. */
   const buyVice = (v: BarterItem<ViceId>): void => {
     if (netME < v.me) return;
@@ -760,7 +778,7 @@ export default function VicesAiPage() {
       {/* ─────────────── PHONE FRAME ───────────────
           Mobile: fills the native viewport edge-to-edge.
           Desktop: centered, cropped device mock-up with rounded bezel. */}
-      <div className="relative h-dvh w-full overflow-hidden bg-gradient-to-b from-[#FAF8F4] to-[#F1EDE5] lg:h-[920px] lg:max-h-[96vh] lg:w-[460px] lg:rounded-[52px] lg:border lg:border-stone-700/60 lg:ring-[10px] lg:ring-stone-900 lg:shadow-[0_50px_140px_-20px_rgba(28,25,23,0.55)]">
+      <div className="relative h-dvh w-full overflow-hidden bg-gradient-to-b from-[#FAF8F4] to-[#F1EDE5] lg:h-[844px] lg:max-h-[94vh] lg:w-[390px] lg:rounded-[48px] lg:border lg:border-stone-700/60 lg:ring-[10px] lg:ring-stone-900 lg:shadow-[0_50px_140px_-20px_rgba(28,25,23,0.55)]">
 
         {/* Soft animated mesh wash on the screen itself — keeps it from feeling flat */}
         <div className="floaty pointer-events-none absolute inset-0 opacity-70 bg-[radial-gradient(circle_at_15%_10%,rgba(16,185,129,0.10),transparent_45%),radial-gradient(circle_at_85%_15%,rgba(244,63,94,0.08),transparent_45%),radial-gradient(circle_at_50%_100%,rgba(14,165,233,0.08),transparent_50%)]" />
@@ -821,7 +839,7 @@ export default function VicesAiPage() {
         )}
 
         {/* ─────────────── SINGLE-SCREEN APP SHELL (zero scroll) ─────────────── */}
-        <div className="flex h-full flex-col justify-between gap-3 overflow-hidden p-6 lg:pt-12">
+        <div className="flex h-full flex-col justify-between gap-3 overflow-hidden p-6 lg:pt-12" onTouchStart={onTouchStart} onTouchEnd={onTouchEnd}>
 
           {/* ── HEADER: brand + live balance pill ── */}
           <header className="flex flex-shrink-0 items-start justify-between">
@@ -932,7 +950,7 @@ export default function VicesAiPage() {
                 {/* For You — recommendation cards (Spotify + Uber Eats) */}
                 <div>
                   <span className="mb-2 flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-[0.16em] text-stone-500"><Sparkles className="h-3.5 w-3.5" /> For you</span>
-                  <div className="no-scrollbar -mx-1 flex gap-3 overflow-x-auto px-1 pb-1">
+                  <div data-noswipe className="no-scrollbar -mx-1 flex gap-3 overflow-x-auto px-1 pb-1">
                     {recs.map((r, i) => (
                       <button
                         key={r.key}
@@ -1153,6 +1171,7 @@ export default function VicesAiPage() {
                     </span>
                   </div>
                   <input
+                    data-noswipe
                     type="range"
                     min={item.min}
                     max={item.max}
@@ -1184,29 +1203,8 @@ export default function VicesAiPage() {
                   </p>
                 </div>
 
-                {/* Quick add — one-tap logging for your go-to habits */}
-                <div>
-                  <p className="mb-2 text-[9px] font-semibold uppercase tracking-[0.18em] text-stone-400">Quick add</p>
-                  <div className="grid grid-cols-4 gap-2">
-                    {QUICK_LOG.map(({ id, qty: n }) => {
-                      const h = ALL_HABITS.find((x) => x.id === id) as BarterItem<HabitId>;
-                      return (
-                        <button
-                          key={id}
-                          onClick={() => bankHabit(h, n)}
-                          className="press flex flex-col items-center gap-1 rounded-xl border border-stone-900/10 bg-white/60 py-2.5 transition-colors hover:bg-white hover:shadow-sm"
-                        >
-                          <span className="text-emerald-600">{h.icon}</span>
-                          <span className="text-[10px] font-bold leading-none text-stone-700">{h.label.split(" ")[0]}</span>
-                          <span className="text-[9px] font-bold tabular-nums text-emerald-600">+{fmt(n * h.me)}</span>
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-
                 {/* This week — compact progress toward the weekly goal */}
-                <div className="rounded-2xl border border-stone-900/10 bg-white/40 p-4">
+                <div className="mt-auto rounded-2xl border border-stone-900/10 bg-white/40 p-4">
                   <div className="flex items-center justify-between">
                     <span className="text-[9px] font-semibold uppercase tracking-[0.18em] text-stone-400">This week</span>
                     <span className="text-[10px] tabular-nums">
