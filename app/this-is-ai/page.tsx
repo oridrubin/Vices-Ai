@@ -2,12 +2,14 @@
 
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
+  Activity,
   Apple,
   Beef,
   Beer,
   Bike,
   Candy,
   ChevronDown,
+  ChevronRight,
   Check,
   Cigarette,
   Crown,
@@ -17,6 +19,7 @@ import {
   EyeOff,
   Flame,
   Footprints,
+  Gift,
   Leaf,
   Lock,
   Martini,
@@ -28,7 +31,9 @@ import {
   Smartphone,
   Snowflake,
   Sparkles,
+  Star,
   ThermometerSun,
+  TrendingUp,
   Trophy,
   UserPlus,
   Users,
@@ -42,7 +47,7 @@ import {
 //  TYPES
 // ════════════════════════════════════════════════════════════════════════════
 
-type Mode = "allowance" | "store" | "friends";
+type Mode = "home" | "allowance" | "store" | "friends";
 
 type HabitCatId = "workout" | "meal" | "water" | "wellness";
 type HabitId =
@@ -355,10 +360,33 @@ const METRICS: Metric[] = [
 
 /** Bottom navigation tabs. */
 const TABS: { id: Mode; label: string; icon: React.ReactNode }[] = [
-  { id: "allowance", label: "Allowance", icon: <Footprints className="w-4 h-4" /> },
-  { id: "store",     label: "Store",     icon: <ShoppingBag className="w-4 h-4" /> },
-  { id: "friends",   label: "Friends",   icon: <Users className="w-4 h-4" /> },
+  { id: "home",      label: "Home",    icon: <Activity className="w-4 h-4" /> },
+  { id: "allowance", label: "Earn",    icon: <Dumbbell className="w-4 h-4" /> },
+  { id: "store",     label: "Store",   icon: <ShoppingBag className="w-4 h-4" /> },
+  { id: "friends",   label: "Friends", icon: <Users className="w-4 h-4" /> },
 ];
+
+/** Duolingo-style weekly earn goal — the dashboard ring + bar fill toward this. */
+const WEEKLY_GOAL = 150;
+
+/** A Spotify / Uber-Eats style "For You" recommendation card on the dashboard. */
+interface Rec {
+  key: string;
+  tag: string;
+  title: string;
+  sub: string;
+  icon: React.ReactNode;
+  /** Tailwind gradient classes for the card face. */
+  grad: string;
+  cta: string;
+  onTap: () => void;
+}
+
+/** Time-of-day greeting for the dashboard header. */
+const greeting = (): string => {
+  const h = new Date().getHours();
+  return h < 5 ? "Late night" : h < 12 ? "Good morning" : h < 18 ? "Good afternoon" : "Good evening";
+};
 
 /** Confetti palettes for the log-entry burst. */
 const CONFETTI_GOOD = ["#10b981", "#34d399", "#0ea5e9", "#a3e635"];
@@ -376,12 +404,17 @@ interface Burst {
 
 export default function VicesAiPage() {
   // ── Core state ──────────────────────────────────────────────────────────
-  const [mode, setMode] = useState<Mode>("allowance");
+  const [mode, setMode] = useState<Mode>("home");
   const [habitId, setHabitId] = useState<HabitId>("run");
   const [habitQty, setHabitQty] = useState<number>(3);
   const [friends, setFriends] = useState<Friend[]>(SEED_FRIENDS);
   const [newFriend, setNewFriend] = useState<string>("");
   const [metric, setMetric] = useState<MetricId>("balanced");
+
+  /** Duolingo-style daily streak — consecutive days with a logged habit. Unlike
+   *  the weekly point ledger, the streak carries across weeks. */
+  const [streak, setStreak] = useState<number>(0);
+  const [lastLogDay, setLastLogDay] = useState<string | null>(null);
 
   /** Store: a transient "you bought X" toast after a purchase. */
   const [toast, setToast] = useState<{ id: number; label: string; pts: number } | null>(null);
@@ -450,11 +483,27 @@ export default function VicesAiPage() {
         }
       }
     } catch { /* corrupted storage — keep seeds */ }
+    try {
+      const raw = localStorage.getItem("vices-streak-v1");
+      if (raw) {
+        const p = JSON.parse(raw);
+        // A streak survives only if you logged today or yesterday; older = broken.
+        const today = new Date(); today.setHours(0, 0, 0, 0);
+        const last = p.lastLogDay ? new Date(p.lastLogDay) : null;
+        const days = last ? Math.round((today.getTime() - last.getTime()) / 86400000) : 99;
+        setStreak(days <= 1 ? (p.streak ?? 0) : 0);
+        setLastLogDay(p.lastLogDay ?? null);
+      }
+    } catch { /* corrupted storage — no streak */ }
   }, []);
   useEffect(() => {
     if (!hydrated.current) return;
     localStorage.setItem("vices-ledger-v2", JSON.stringify({ week: weekOf(), earned: earnedME, spent: spentME, lastEntry }));
   }, [earnedME, spentME, lastEntry]);
+  useEffect(() => {
+    if (!hydrated.current) return;
+    localStorage.setItem("vices-streak-v1", JSON.stringify({ streak, lastLogDay }));
+  }, [streak, lastLogDay]);
   useEffect(() => {
     if (!hydrated.current) return;
     localStorage.setItem("vices-friends-v3", JSON.stringify({ week: weekOf(), friends }));
@@ -466,6 +515,7 @@ export default function VicesAiPage() {
   // ── Current selection + reactive math ───────────────────────────────────
   const habit = ALL_HABITS.find((h) => h.id === habitId) as BarterItem<HabitId>;
 
+  const isHome = mode === "home";
   const isAllowance = mode === "allowance";
   const isStore = mode === "store";
   const isFriends = mode === "friends";
@@ -519,6 +569,50 @@ export default function VicesAiPage() {
       ? { label: "Karma Deficit",    dot: "bg-amber-400",   text: "text-amber-600",   glow: "shadow-[0_0_8px_rgba(251,191,36,0.5)]" }
       : { label: "Neutral Zone",     dot: "bg-stone-300",   text: "text-stone-500",   glow: "shadow-[0_0_8px_rgba(214,211,209,0.6)]" };
 
+  // ── Dashboard rings (Apple-Fitness style) ───────────────────────────────
+  //  Outer ring = progress toward this week's earn goal; inner = how much of
+  //  what you earned has already been spent.
+  const goalProgress = Math.min(earnedME / WEEKLY_GOAL, 1);
+  const burnProgress = earnedME > 0 ? Math.min(spentME / earnedME, 1) : 0;
+
+  // ── "For You" recommendations (Spotify / Uber-Eats reward cards) ─────────
+  const recs = useMemo<Rec[]>(() => {
+    const out: Rec[] = [];
+    // Best reward you can claim right now — the Uber-Eats "claim it" moment.
+    const affordable = ALL_VICES.filter((v) => wallet >= v.me).sort((a, b) => b.me - a.me);
+    if (affordable.length) {
+      const v = affordable[0];
+      out.push({
+        key: `claim-${v.id}`, tag: "Ready to claim", title: v.label, sub: `${fmt(v.me)} pts · you earned this`,
+        icon: v.icon, grad: "from-rose-500 to-amber-500", cta: "Claim it", onTap: () => setMode("store"),
+      });
+    }
+    // The next reward just out of reach — the carrot that pulls you back to Earn.
+    const locked = ALL_VICES.filter((v) => wallet < v.me).sort((a, b) => a.me - b.me);
+    if (locked.length) {
+      const v = locked[0];
+      out.push({
+        key: `almost-${v.id}`, tag: "Almost there", title: v.label, sub: `${fmt(v.me - wallet)} pts to unlock`,
+        icon: v.icon, grad: "from-violet-500 to-indigo-500", cta: "Earn it", onTap: () => setMode("allowance"),
+      });
+    }
+    // Streak nudge — Duolingo's "don't break the chain."
+    out.push({
+      key: "streak",
+      tag: streak > 0 ? `${streak}-day streak` : "Start a streak",
+      title: streak > 0 ? "Keep it alive" : "Log today",
+      sub: streak > 0 ? "Earn to extend it" : "One habit starts it",
+      icon: <Flame className="h-4 w-4" />, grad: "from-orange-500 to-rose-500", cta: "Earn", onTap: () => setMode("allowance"),
+    });
+    // Quick win — a one-tap top-up suggestion.
+    out.push({
+      key: "topup", tag: "Quick win", title: "Hit the sauna", sub: "+5 pts in one tap",
+      icon: <ThermometerSun className="h-4 w-4" />, grad: "from-emerald-500 to-teal-500", cta: "Log it",
+      onTap: () => { setHabitId("sauna"); setHabitQty(1); setMode("allowance"); },
+    });
+    return out;
+  }, [wallet, streak]);
+
   // ── Actions ─────────────────────────────────────────────────────────────
   /** Shower of particles off whatever just got tapped (green = earn, warm = spend). */
   const fireBurst = (good: boolean): void => {
@@ -543,6 +637,16 @@ export default function VicesAiPage() {
     setLastEntry(
       `${item.label} · ${plur(qty, item.unitOne, item.unit)} · +${fmt(totalME)} pts · ${new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`,
     );
+    // Advance the streak: +1 if yesterday was the last log, reset to 1 if a gap,
+    // unchanged if you already logged today.
+    const today = new Date(); today.setHours(0, 0, 0, 0);
+    const todayStr = today.toISOString().slice(0, 10);
+    if (lastLogDay !== todayStr) {
+      const last = lastLogDay ? new Date(lastLogDay) : null;
+      const gap = last ? Math.round((today.getTime() - last.getTime()) / 86400000) : 99;
+      setStreak((s) => (gap === 1 ? s + 1 : 1));
+      setLastLogDay(todayStr);
+    }
     fireBurst(true);
   };
 
@@ -657,23 +761,137 @@ export default function VicesAiPage() {
                 Vices<span className="text-emerald-500">.ai</span>
               </h1>
             </div>
-            <div className="flex flex-col items-end gap-1">
-              <span className="text-[8px] font-semibold uppercase tracking-[0.2em] text-stone-400">Life Balance</span>
-              <div className="flex items-center gap-1.5 rounded-full border border-stone-900/10 bg-white/70 px-2.5 py-1">
-                <span className={`h-1.5 w-1.5 animate-pulse rounded-full ${status.dot} ${status.glow}`} />
-                <span className={`text-[10px] font-semibold ${status.text}`}>{status.label}</span>
-                <span className={`text-[11px] font-black tabular-nums ${status.text}`}>
-                  {netME >= 0 ? "+" : ""}{fmt(netME)} pts
-                </span>
+            <div className="flex items-center gap-2">
+              {streak > 0 && (
+                <div className="flex items-center gap-1 rounded-full border border-orange-500/20 bg-orange-500/10 px-2 py-1" title={`${streak}-day streak`}>
+                  <Flame className="h-3.5 w-3.5 text-orange-500" />
+                  <span className="text-[12px] font-black tabular-nums text-orange-600">{streak}</span>
+                </div>
+              )}
+              <div className="flex flex-col items-end gap-1">
+                <span className="text-[8px] font-semibold uppercase tracking-[0.2em] text-stone-400">Life Balance</span>
+                <div className="flex items-center gap-1.5 rounded-full border border-stone-900/10 bg-white/70 px-2.5 py-1">
+                  <span className={`h-1.5 w-1.5 animate-pulse rounded-full ${status.dot} ${status.glow}`} />
+                  <span className={`text-[10px] font-semibold ${status.text}`}>{status.label}</span>
+                  <span className={`text-[11px] font-black tabular-nums ${status.text}`}>
+                    {netME >= 0 ? "+" : ""}{fmt(netME)} pts
+                  </span>
+                </div>
+                <span className="text-[7px] font-semibold uppercase tracking-[0.2em] text-stone-400/80">resets every monday</span>
               </div>
-              <span className="text-[7px] font-semibold uppercase tracking-[0.2em] text-stone-400/80">resets every monday</span>
             </div>
           </header>
 
           {/* ── MAIN PANEL (the only region allowed to flex) ── */}
           <main className={`no-scrollbar min-h-0 flex-1 overflow-y-auto ${glass} p-5`}>
             <div className="flex min-h-full flex-col gap-4">
-            {isFriends ? (
+            {isHome ? (
+              <>
+                {/* ── HOME DASHBOARD: rings, goal, and reward recommendations ── */}
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-[11px] font-semibold text-stone-400">{greeting()}</p>
+                    <h2 className="text-lg font-black leading-tight text-stone-900">Here&apos;s your balance</h2>
+                  </div>
+                  <button
+                    onClick={() => setMode("allowance")}
+                    className="press flex items-center gap-1 rounded-full bg-stone-900 px-3.5 py-2 text-[11px] font-bold text-white shadow-md shadow-stone-900/20"
+                  >
+                    <Zap className="h-3.5 w-3.5" /> Log
+                  </button>
+                </div>
+
+                {/* Apple-Fitness style dual ring */}
+                <div className="rounded-3xl border border-stone-900/10 bg-white/70 p-5 shadow-sm">
+                  <div className="flex items-center gap-5">
+                    <div className="relative h-[132px] w-[132px] flex-shrink-0">
+                      <svg viewBox="0 0 132 132" className="h-full w-full -rotate-90">
+                        <circle cx="66" cy="66" r="58" fill="none" stroke="rgba(16,185,129,0.12)" strokeWidth="11" />
+                        <circle cx="66" cy="66" r="44" fill="none" stroke="rgba(244,63,94,0.12)" strokeWidth="11" />
+                        <circle
+                          cx="66" cy="66" r="58" fill="none" stroke="#10b981" strokeWidth="11" strokeLinecap="round"
+                          strokeDasharray={2 * Math.PI * 58} strokeDashoffset={2 * Math.PI * 58 * (1 - goalProgress)}
+                          style={{ transition: "stroke-dashoffset .6s ease" }}
+                        />
+                        <circle
+                          cx="66" cy="66" r="44" fill="none" stroke="#f43f5e" strokeWidth="11" strokeLinecap="round"
+                          strokeDasharray={2 * Math.PI * 44} strokeDashoffset={2 * Math.PI * 44 * (1 - burnProgress)}
+                          style={{ transition: "stroke-dashoffset .6s ease" }}
+                        />
+                      </svg>
+                      <div className="absolute inset-0 flex flex-col items-center justify-center">
+                        <span key={wallet} className="text-3xl font-black leading-none tabular-nums text-stone-900" style={{ animation: "pop .25s ease" }}>{fmt(wallet)}</span>
+                        <span className="text-[8px] font-bold uppercase tracking-[0.16em] text-stone-400">to spend</span>
+                      </div>
+                    </div>
+                    <div className="flex-1 space-y-3">
+                      <div>
+                        <div className="flex items-center gap-1.5">
+                          <span className="h-2 w-2 rounded-full bg-emerald-500" />
+                          <span className="text-[10px] font-bold uppercase tracking-wider text-stone-400">Earned</span>
+                        </div>
+                        <p className="text-xl font-black tabular-nums text-stone-900">{fmt(earnedME)} <span className="text-xs font-semibold text-stone-400">/ {WEEKLY_GOAL}</span></p>
+                      </div>
+                      <div>
+                        <div className="flex items-center gap-1.5">
+                          <span className="h-2 w-2 rounded-full bg-rose-500" />
+                          <span className="text-[10px] font-bold uppercase tracking-wider text-stone-400">Spent</span>
+                        </div>
+                        <p className="text-xl font-black tabular-nums text-stone-900">{fmt(spentME)} <span className="text-xs font-semibold text-stone-400">pts</span></p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Weekly goal bar (Duolingo progression) */}
+                <div className="rounded-2xl border border-stone-900/10 bg-white/40 p-4">
+                  <div className="mb-2 flex items-center justify-between">
+                    <span className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-[0.16em] text-stone-500"><TrendingUp className="h-3.5 w-3.5" /> Weekly goal</span>
+                    <span className="text-[11px] font-bold tabular-nums text-stone-500">{fmt(earnedME)} / {WEEKLY_GOAL}</span>
+                  </div>
+                  <div className="h-2.5 overflow-hidden rounded-full bg-stone-900/10">
+                    <div className="h-full rounded-full bg-gradient-to-r from-emerald-500 to-teal-400" style={{ width: `${goalProgress * 100}%`, transition: "width .6s ease" }} />
+                  </div>
+                  <p className="mt-2 text-[10px] text-stone-400">
+                    {goalProgress >= 1 ? "Goal smashed — you've earned the weekend." : `${fmt(WEEKLY_GOAL - earnedME)} pts to hit this week's goal.`}
+                  </p>
+                </div>
+
+                {/* For You — recommendation cards (Spotify + Uber Eats) */}
+                <div>
+                  <span className="mb-2 flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-[0.16em] text-stone-500"><Sparkles className="h-3.5 w-3.5" /> For you</span>
+                  <div className="no-scrollbar -mx-1 flex gap-3 overflow-x-auto px-1 pb-1">
+                    {recs.map((r, i) => (
+                      <button
+                        key={r.key}
+                        onClick={r.onTap}
+                        style={{ animation: `fadeUp .3s ease ${i * 60}ms both` }}
+                        className={`press relative flex h-[126px] w-[152px] flex-shrink-0 flex-col justify-between overflow-hidden rounded-2xl bg-gradient-to-br ${r.grad} p-3.5 text-left text-white shadow-lg`}
+                      >
+                        <div className="flex items-center justify-between">
+                          <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-white/20">{r.icon}</span>
+                          <span className="text-[8px] font-bold uppercase tracking-wider text-white/80">{r.tag}</span>
+                        </div>
+                        <div>
+                          <p className="text-sm font-black leading-tight">{r.title}</p>
+                          <p className="text-[10px] text-white/80">{r.sub}</p>
+                        </div>
+                        <span className="flex items-center gap-0.5 text-[10px] font-bold">{r.cta}<ChevronRight className="h-3 w-3" /></span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Last move */}
+                <div className="mt-auto flex items-center gap-3 rounded-2xl border border-stone-900/10 bg-white/40 px-4 py-3">
+                  <span className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-xl bg-stone-900/5 text-stone-500"><Activity className="h-4 w-4" /></span>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-[9px] font-bold uppercase tracking-[0.16em] text-stone-400">Last move</p>
+                    <p className="truncate text-[12px] font-semibold text-stone-700">{lastEntry ?? "Nothing yet — log your first habit."}</p>
+                  </div>
+                </div>
+              </>
+            ) : isFriends ? (
               <>
                 {/* Leaderboard: one squad, four ways to judge it */}
                 <div>
