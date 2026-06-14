@@ -20,10 +20,13 @@ import {
   Flame,
   Footprints,
   Gift,
+  History,
+  Hourglass,
   Leaf,
-  Lock,
   Martini,
+  MessageCircle,
   PersonStanding,
+  Receipt,
   Salad,
   Scale,
   ShoppingBag,
@@ -264,6 +267,87 @@ const weekOf = (): string => {
 };
 
 // ════════════════════════════════════════════════════════════════════════════
+//  THE TAB (borrow against future effort)
+//  Spend more than you've banked and you go on the tab: a 36-hour window to earn
+//  it back, plus interest that starts at 10% and climbs once you blow the clock.
+// ════════════════════════════════════════════════════════════════════════════
+
+const LOAN_WINDOW_MS = 36 * 3600 * 1000;
+
+/** Interest rate on the tab: 10% flat, then +5%/hr once overdue (caps at 50%). */
+const loanRate = (dueAt: number, now: number): number => {
+  const lateHrs = Math.max(0, (now - dueAt) / 3600000);
+  return Math.min(0.5, 0.1 + 0.05 * lateHrs);
+};
+
+/** Interest owed on a principal, rounded up to a whole point. */
+const loanInterest = (principal: number, dueAt: number, now: number): number =>
+  Math.ceil(principal * loanRate(dueAt, now));
+
+/** "12h 30m 05s" — the live countdown on the tab banner. Always shows seconds so
+ *  you can watch the clock actually move. */
+const fmtCountdown = (dueAt: number, now: number): string => {
+  const ms = Math.abs(dueAt - now);
+  const h = Math.floor(ms / 3600000);
+  const m = Math.floor((ms % 3600000) / 60000);
+  const s = Math.floor((ms % 60000) / 1000);
+  const pad = (n: number) => n.toString().padStart(2, "0");
+  return h > 0 ? `${h}h ${pad(m)}m ${pad(s)}s` : `${m}m ${pad(s)}s`;
+};
+
+// ════════════════════════════════════════════════════════════════════════════
+//  WEEKLY VERDICT (every Monday, a recap of the week that just ended)
+// ════════════════════════════════════════════════════════════════════════════
+
+type VerdictId = "quiet" | "dork" | "balanced" | "degen";
+
+interface Verdict {
+  id: VerdictId;
+  title: string;
+  body: string;
+  icon: React.ReactNode;
+  grad: string;
+  text: string;
+}
+
+const VERDICTS: Record<VerdictId, Verdict> = {
+  quiet: {
+    id: "quiet", title: "Quiet Week", body: "Barely logged a thing. No grind, no vice — show up next week.",
+    icon: <Hourglass className="h-7 w-7" />, grad: "from-stone-500 to-stone-700", text: "text-stone-600",
+  },
+  dork: {
+    id: "dork", title: "Super Dork Week", body: "You earned a mountain and spent jack. Drink a beer, you absolute dork.",
+    icon: <Sparkles className="h-7 w-7" />, grad: "from-sky-500 to-indigo-500", text: "text-sky-600",
+  },
+  balanced: {
+    id: "balanced", title: "Balanced Week", body: "Earned hard, spent smart, stayed even. This is the whole point.",
+    icon: <Scale className="h-7 w-7" />, grad: "from-emerald-500 to-teal-500", text: "text-emerald-600",
+  },
+  degen: {
+    id: "degen", title: "Degen Week", body: "You spent more than you earned and dipped into the tab. Iconic. Concerning.",
+    icon: <Skull className="h-7 w-7" />, grad: "from-rose-500 to-amber-500", text: "text-rose-600",
+  },
+};
+
+/** Grade a finished week by how close spending landed to break-even (spent ≈
+ *  earned). Earn 100 and spend ~60–140 → Balanced; hoard most of it → Dork;
+ *  blow past what you banked → Degen. */
+const weekVerdict = (earned: number, spent: number): VerdictId => {
+  if (earned + spent < 20) return "quiet";
+  const r = earned > 0 ? spent / earned : (spent > 0 ? 2 : 0);
+  if (Math.abs(r - 1) <= 0.4) return "balanced";
+  return r < 1 ? "dork" : "degen";
+};
+
+/** One archived week, kept forever in the History sheet. */
+interface WeekRecord {
+  week: string;
+  earned: number;
+  spent: number;
+  verdict: VerdictId;
+}
+
+// ════════════════════════════════════════════════════════════════════════════
 //  FRIENDS / LEADERBOARD
 //  Every player carries weekly earned (habit) and spent (vice) mile totals, so
 //  the board can rank the group through whatever lens the metric chips select.
@@ -282,20 +366,25 @@ interface Friend {
 /** A friend with their net balance precomputed for metric scoring. */
 type Ranked = Friend & { net: number };
 
-/** Local demo friends until real account sync lands. Spent never exceeds earned —
- *  you can't go below zero — so the cohort spans pure grind to fully cashed out. */
+/** Local demo friends. The tab lets you overspend, so the cohort now spans pure
+ *  grind (banked it all) through break-even to a deep degen on the tab. */
 const SEED_FRIENDS: Friend[] = [
-  { name: "Jake", earned: 90, spent: 10, last: "Running · 8 miles · +80 pts" },     // dork — banked it all
-  { name: "Ori",  earned: 60, spent: 32, last: "Gym Workout · 1 session · +20 pts" }, // balanced — spent ~half
-  { name: "Maya", earned: 45, spent: 18, last: "Lifting · 1 session · +20 pts" },
-  { name: "Zoe",  earned: 50, spent: 48, last: "Heavy Night Out · 1 night · -60 pts" }, // degen — cashed out
+  { name: "Jake", earned: 100, spent: 15, last: "Running · 8 miles · +80 pts" },      // dork — hoards it
+  { name: "Ori",  earned: 72,  spent: 70, last: "Gym Workout · 1 session · +20 pts" }, // balanced — dead even
+  { name: "Maya", earned: 48,  spent: 30, last: "Lifting · 1 session · +20 pts" },     // mild grind
+  { name: "Zoe",  earned: 30,  spent: 85, last: "Heavy Night Out · 1 night · -60 pts" }, // degen — on the tab
 ];
 
-/** Share of earned points that got spent on vices: 0 = banked everything (grind),
- *  1 = cashed out every point (max indulgence). Spending is capped at earnings —
- *  you can't go below zero — so this always lives in [0, 1]. */
+/** Spend ratio: spent ÷ earned. 1.0 means you spent exactly what you banked. Now
+ *  that the tab allows overspending it can exceed 1; 0 means you hoarded it all. */
 const spendRatio = (f: { earned: number; spent: number }): number =>
-  f.earned > 0 ? Math.min(f.spent / f.earned, 1) : 0;
+  f.earned > 0 ? f.spent / f.earned : (f.spent > 0 ? 2 : 0);
+
+/** Moderation, 0…1: how close you landed to break-even (spent ≈ earned). Peaks
+ *  at 1.0 when r = 1, fading linearly to 0 once you've hoarded everything (r = 0)
+ *  or spent double what you banked (r = 2). Earn 100, spend ~80–120 → ~0.8–1.0. */
+const moderationOf = (f: { earned: number; spent: number }): number =>
+  Math.max(0, 1 - Math.abs(spendRatio(f) - 1));
 
 /** How active someone was this week, 0…1. A quiet week can't top any board —
  *  you have to actually live to win, in either direction. */
@@ -326,10 +415,10 @@ const METRICS: Metric[] = [
   {
     id: "balanced",
     label: "Balanced",
-    tagline: "Spent about half of what you earned, stayed active. Peak moderation.",
+    tagline: "Spent just about what you earned — banked it, then enjoyed it. Peak moderation.",
     unit: "balance",
     icon: <Scale className="w-4 h-4" />,
-    score: (f) => Math.round((1 - Math.abs(spendRatio(f) - 0.5) * 2) * 100 * engagement(f)),
+    score: (f) => Math.round(moderationOf(f) * 100 * engagement(f)),
     text: "text-emerald-600",
     chipOn: "border-emerald-500 bg-emerald-500 text-white shadow-lg shadow-emerald-500/30",
     glow: "rgba(16,185,129,0.45)",
@@ -337,10 +426,10 @@ const METRICS: Metric[] = [
   {
     id: "degen",
     label: "Degen",
-    tagline: "Cashed out nearly every point you earned on vices. Iconic. Concerning.",
+    tagline: "Spent more than you banked and leaned on the tab. Iconic. Concerning.",
     unit: "degen",
     icon: <Skull className="w-4 h-4" />,
-    score: (f) => Math.round(spendRatio(f) * 100 * engagement(f)),
+    score: (f) => Math.round(Math.min(spendRatio(f) / 2, 1) * 100 * engagement(f)),
     text: "text-rose-600",
     chipOn: "border-rose-500 bg-rose-500 text-white shadow-lg shadow-rose-500/30",
     glow: "rgba(244,63,94,0.45)",
@@ -351,7 +440,7 @@ const METRICS: Metric[] = [
     tagline: "Earned a pile and barely spent it. Insufferably disciplined.",
     unit: "grind",
     icon: <Sparkles className="w-4 h-4" />,
-    score: (f) => Math.round((1 - spendRatio(f)) * 100 * engagement(f)),
+    score: (f) => Math.round(Math.max(0, 1 - spendRatio(f)) * 100 * engagement(f)),
     text: "text-sky-600",
     chipOn: "border-sky-500 bg-sky-500 text-white shadow-lg shadow-sky-500/30",
     glow: "rgba(14,165,233,0.45)",
@@ -386,6 +475,70 @@ interface Rec {
 const greeting = (): string => {
   const h = new Date().getHours();
   return h < 5 ? "Late night" : h < 12 ? "Good morning" : h < 18 ? "Good afternoon" : "Good evening";
+};
+
+// ════════════════════════════════════════════════════════════════════════════
+//  THE COACH — a foul-mouthed little voice that reacts to how you're playing.
+//  Grind too hard with nothing spent and it tells you to drink a beer, dork.
+// ════════════════════════════════════════════════════════════════════════════
+
+type CoachBucket = "start" | "dork" | "balanced" | "tab" | "loose" | "neutral";
+
+const COACH: Record<CoachBucket, string[]> = {
+  start: [
+    "You haven't done shit. Move your ass before you earn anything.",
+    "Zero logged. Get off your ass and sweat, you lazy fuck.",
+    "Empty. Do something good or fuck off and come back later.",
+  ],
+  dork: [
+    "You're doing too much — drink a beer, you fucking dork.",
+    "Sitting on a pile of points doing fuck-all. Spend it, dipshit.",
+    "Stop grinding and have a damn drink. Nobody's impressed, dork.",
+    "This is a vices app, not a fucking monastery. Go ruin yourself.",
+    "All this discipline and zero fun. You're insufferable. Drink something.",
+  ],
+  balanced: [
+    "Spent what you earned. Annoyingly balanced, you smug bastard.",
+    "Dead even. Disgusting. Don't get cocky, dickhead.",
+    "Earned it, blew it, balanced as hell. Show-off prick.",
+  ],
+  tab: [
+    "You're on the fucking tab, genius. Earn it back before it eats you.",
+    "Spending money you don't have like a true idiot. Run it off.",
+    "Broke and reckless. Clock's ticking, dumbass — go sweat.",
+    "You overdid it, champ. Pay your damn debts before they bite.",
+  ],
+  loose: [
+    "Slow the fuck down, you animal. Log a salad before you die.",
+    "Your liver's writing its will. Go earn some shit back.",
+    "Spending like you've got a death wish. Easy, killer.",
+  ],
+  neutral: [
+    "Eh. Earn more or sin more — do something, you bore.",
+    "Coasting like a coward. Pick a lane, dork.",
+    "Mediocre. Go be great or go be bad. Your call, champ.",
+  ],
+};
+
+/** Pick the coach's mood from how you're playing right now. */
+const coachBucket = (earned: number, spent: number, onTab: boolean): CoachBucket => {
+  if (onTab) return "tab";
+  if (earned < 10 && spent < 10) return "start";
+  const r = earned > 0 ? spent / earned : 0;
+  if (earned >= 40 && r < 0.3) return "dork";
+  if (Math.abs(r - 1) <= 0.35 && earned >= 20) return "balanced";
+  if (r > 1.2) return "loose";
+  return "neutral";
+};
+
+/** Icon-bubble tint per coach mood. */
+const COACH_TINT: Record<CoachBucket, string> = {
+  start: "bg-emerald-500/10 text-emerald-600",
+  dork: "bg-sky-500/10 text-sky-600",
+  balanced: "bg-emerald-500/10 text-emerald-600",
+  tab: "bg-amber-500/10 text-amber-600",
+  loose: "bg-rose-500/10 text-rose-600",
+  neutral: "bg-stone-900/5 text-stone-500",
 };
 
 /** First-run onboarding — four quick cards, skippable at any point. */
@@ -427,14 +580,32 @@ export default function VicesAiPage() {
   /** First-run tutorial: current step, or -1 once finished/skipped. */
   const [onboardStep, setOnboardStep] = useState<number>(-1);
 
-  /** Store: a transient "you bought X" toast after a purchase. */
-  const [toast, setToast] = useState<{ id: number; label: string; pts: number } | null>(null);
+  /** Store: a transient toast after a purchase or a tab payoff (pts is signed). */
+  const [toast, setToast] = useState<{ id: number; text: string; pts: number } | null>(null);
+
+  /** Which coach line to show — bumped on every log/buy and on tap to reroll. */
+  const [coachIdx, setCoachIdx] = useState<number>(0);
 
   /** Weekly point totals — earned by habits, spent on vices. Net is derived. */
   const [earnedME, setEarnedME] = useState<number>(0);
   const [spentME, setSpentME] = useState<number>(0);
   const [lastEntry, setLastEntry] = useState<string | null>(null);
   const netME = round2(earnedME - spentME);
+
+  /** Lifetime tallies (never reset): per-item counts + all-time point totals. */
+  const [history, setHistory] = useState<Record<string, number>>({});
+  const [lifeEarned, setLifeEarned] = useState<number>(0);
+  const [lifeSpent, setLifeSpent] = useState<number>(0);
+  const [weeks, setWeeks] = useState<WeekRecord[]>([]);
+  const [historyOpen, setHistoryOpen] = useState<boolean>(false);
+
+  /** The tab: when set, you owe money and the 36-hour clock is running. */
+  const [loanDueAt, setLoanDueAt] = useState<number | null>(null);
+  /** Ticks once a second while the tab is open so the countdown stays live. */
+  const [now, setNow] = useState<number>(() => Date.now());
+
+  /** Monday recap modal — set on load when a finished week is detected. */
+  const [recap, setRecap] = useState<WeekRecord | null>(null);
 
   /** In-flight log celebration (confetti + floating delta). */
   const [burst, setBurst] = useState<Burst | null>(null);
@@ -457,6 +628,25 @@ export default function VicesAiPage() {
   //  initial empty state never clobbers a balance stored on a previous visit.
   const hydrated = useRef<boolean>(false);
   useEffect(() => {
+    // Lifetime history (never resets).
+    try {
+      const raw = localStorage.getItem("vices-history-v1");
+      if (raw) {
+        const p = JSON.parse(raw);
+        if (p && typeof p === "object") {
+          setHistory(p.history ?? {});
+          setLifeEarned(p.lifeEarned ?? 0);
+          setLifeSpent(p.lifeSpent ?? 0);
+        }
+      }
+    } catch { /* no history yet */ }
+    // Archived weekly recaps (never reset).
+    let archived: WeekRecord[] = [];
+    try {
+      const raw = localStorage.getItem("vices-weeks-v1");
+      if (raw) { const p = JSON.parse(raw); if (Array.isArray(p)) archived = p; }
+    } catch { /* no archive yet */ }
+
     try {
       const raw = localStorage.getItem("vices-ledger-v2");
       if (raw) {
@@ -472,9 +662,16 @@ export default function VicesAiPage() {
             setSpentME(Math.max(-n, 0));
           }
           setLastEntry(p.lastEntry ?? null);
+          setLoanDueAt(typeof p.loanDueAt === "number" ? p.loanDueAt : null);
+        } else if (typeof p.earned === "number" && (p.earned + (p.spent ?? 0)) > 0 && p.week) {
+          // A finished week — grade it, archive it, and queue the Monday recap.
+          const rec: WeekRecord = { week: p.week, earned: p.earned, spent: p.spent ?? 0, verdict: weekVerdict(p.earned, p.spent ?? 0) };
+          if (!archived.some((w) => w.week === rec.week)) archived = [rec, ...archived];
+          setRecap(rec);
         }
       }
     } catch { /* corrupted storage — start clean */ }
+    setWeeks(archived);
     try {
       const raw = localStorage.getItem("vices-friends-v3");
       if (raw) {
@@ -509,12 +706,27 @@ export default function VicesAiPage() {
   }, []);
   useEffect(() => {
     if (!hydrated.current) return;
-    localStorage.setItem("vices-ledger-v2", JSON.stringify({ week: weekOf(), earned: earnedME, spent: spentME, lastEntry }));
-  }, [earnedME, spentME, lastEntry]);
+    localStorage.setItem("vices-ledger-v2", JSON.stringify({ week: weekOf(), earned: earnedME, spent: spentME, lastEntry, loanDueAt }));
+  }, [earnedME, spentME, lastEntry, loanDueAt]);
   useEffect(() => {
     if (!hydrated.current) return;
     localStorage.setItem("vices-streak-v1", JSON.stringify({ streak, lastLogDay }));
   }, [streak, lastLogDay]);
+  useEffect(() => {
+    if (!hydrated.current) return;
+    localStorage.setItem("vices-history-v1", JSON.stringify({ history, lifeEarned, lifeSpent }));
+  }, [history, lifeEarned, lifeSpent]);
+  useEffect(() => {
+    if (!hydrated.current) return;
+    localStorage.setItem("vices-weeks-v1", JSON.stringify(weeks));
+  }, [weeks]);
+  // Keep the tab countdown live — tick once a second only while a tab is open.
+  useEffect(() => {
+    if (loanDueAt === null) return;
+    setNow(Date.now());
+    const t = window.setInterval(() => setNow(Date.now()), 1000);
+    return () => window.clearInterval(t);
+  }, [loanDueAt]);
   // Show the tutorial once, ever — first run with no stored flag.
   useEffect(() => {
     try {
@@ -545,6 +757,17 @@ export default function VicesAiPage() {
 
   /** Points available to spend in the Store (never negative on the banner). */
   const wallet = Math.max(netME, 0);
+
+  // ── The tab (live, ticks with `now`) ────────────────────────────────────
+  const onTab = loanDueAt !== null;
+  const debt = Math.max(-netME, 0);
+  const tabInterest = onTab ? loanInterest(debt, loanDueAt as number, now) : 0;
+  const tabOwed = debt + tabInterest;
+  const tabOverdue = onTab && now > (loanDueAt as number);
+
+  // ── The coach (reacts to how you're playing) ────────────────────────────
+  const coachMood = coachBucket(earnedME, spentME, onTab);
+  const coachLine = COACH[coachMood][coachIdx % COACH[coachMood].length];
 
   /** What the effort you're about to log buys — three single-vice maxes plus a
    *  realistic mix. The headline "either 3 beers, 2 cigs, or 1 joint" answer. */
@@ -648,12 +871,27 @@ export default function VicesAiPage() {
     window.setTimeout(() => setBurst((b) => (b && b.id === id ? null : b)), 950);
   };
 
-  /** Allowance: bank points for a logged habit. */
   /** Bank points for any habit + quantity. Shared by the main Log button and the
-   *  one-tap Quick Add chips. */
+   *  one-tap Quick Add chips. Also pays off the tab (with interest) when the
+   *  fresh points clear what you owed. */
   const bankHabit = (h: BarterItem<HabitId>, n: number): void => {
     const pts = round2(n * h.me);
-    setEarnedME((prev) => round2(prev + pts));
+    const newEarned = round2(earnedME + pts);
+    // Settle the tab if this earning gets you back to (or above) even.
+    if (loanDueAt !== null && newEarned - spentME >= 0) {
+      const principal = Math.max(spentME - earnedME, 0);
+      const interest = loanInterest(principal, loanDueAt, Date.now());
+      const newSpent = round2(spentME + interest);
+      setSpentME(newSpent);
+      setLoanDueAt(newEarned - newSpent >= 0 ? null : Date.now() + LOAN_WINDOW_MS);
+      const tid = Date.now() + 1;
+      setToast({ id: tid, text: interest > 0 ? `Tab cleared · ${fmt(interest)} pts interest` : "Tab cleared", pts: -interest });
+      window.setTimeout(() => setToast((t) => (t && t.id === tid ? null : t)), 1800);
+    }
+    setEarnedME(newEarned);
+    setLifeEarned((prev) => round2(prev + pts));
+    setCoachIdx((i) => i + 1);
+    setHistory((prev) => ({ ...prev, [h.id]: round2((prev[h.id] ?? 0) + n) }));
     setLastEntry(
       `${h.label} · ${plur(n, h.unitOne, h.unit)} · +${fmt(pts)} pts · ${new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`,
     );
@@ -704,15 +942,21 @@ export default function VicesAiPage() {
     else if (dx > 0 && i > 0) setMode(order[i - 1]);
   };
 
-  /** Store: spend points on a vice. Locked items (can't afford) no-op. */
+  /** Store: spend points on a vice. You can overspend — that opens the tab, a
+   *  36-hour loan against future effort. */
   const buyVice = (v: BarterItem<ViceId>): void => {
-    if (netME < v.me) return;
+    const borrowed = spentME + v.me > earnedME; // pushes you below zero?
     setSpentME((prev) => round2(prev + v.me));
+    setLifeSpent((prev) => round2(prev + v.me));
+    setCoachIdx((i) => i + 1);
+    setHistory((prev) => ({ ...prev, [v.id]: (prev[v.id] ?? 0) + 1 }));
     setLastEntry(
       `${v.label} · 1 ${v.unitOne} · -${fmt(v.me)} pts · ${new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`,
     );
+    // Open the tab the moment a purchase takes you negative (clock starts now).
+    if (loanDueAt === null && borrowed) setLoanDueAt(Date.now() + LOAN_WINDOW_MS);
     const id = Date.now();
-    setToast({ id, label: v.label, pts: v.me });
+    setToast({ id, text: borrowed ? `${v.label} · on the tab` : `Enjoy your ${v.label.toLowerCase()}`, pts: -v.me });
     window.setTimeout(() => setToast((t) => (t && t.id === id ? null : t)), 1600);
     fireBurst(false);
   };
@@ -883,13 +1127,45 @@ export default function VicesAiPage() {
                     <p className="text-[11px] font-semibold text-stone-400">{greeting()}</p>
                     <h2 className="text-lg font-black leading-tight text-stone-900">Here&apos;s your balance</h2>
                   </div>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => setHistoryOpen(true)}
+                      className="press flex h-9 w-9 items-center justify-center rounded-full border border-stone-900/10 bg-white/70 text-stone-500 shadow-sm transition-colors hover:text-stone-900"
+                      aria-label="History"
+                    >
+                      <History className="h-4 w-4" />
+                    </button>
+                    <button
+                      onClick={() => setMode("allowance")}
+                      className="press flex items-center gap-1 rounded-full bg-stone-900 px-3.5 py-2 text-[11px] font-bold text-white shadow-md shadow-stone-900/20"
+                    >
+                      <Zap className="h-3.5 w-3.5" /> Log
+                    </button>
+                  </div>
+                </div>
+
+                {/* The tab — live countdown while you owe against future effort */}
+                {onTab && (
                   <button
                     onClick={() => setMode("allowance")}
-                    className="press flex items-center gap-1 rounded-full bg-stone-900 px-3.5 py-2 text-[11px] font-bold text-white shadow-md shadow-stone-900/20"
+                    className={`press relative flex w-full items-center gap-3 overflow-hidden rounded-2xl bg-gradient-to-r p-4 text-left text-white shadow-lg ${tabOverdue ? "from-rose-600 to-red-600 shadow-rose-600/30" : "from-amber-500 to-rose-500 shadow-amber-500/25"}`}
+                    style={{ animation: "fadeUp .3s ease" }}
                   >
-                    <Zap className="h-3.5 w-3.5" /> Log
+                    <span className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl bg-white/20">
+                      <Receipt className="h-5 w-5" />
+                    </span>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-[9px] font-bold uppercase tracking-[0.18em] text-white/80">{tabOverdue ? "Tab overdue" : "On the tab"}</p>
+                      <p className="text-lg font-black leading-tight">You owe {fmt(tabOwed)} pts</p>
+                      <p className="text-[10px] text-white/85">
+                        {fmt(debt)} borrowed + {fmt(tabInterest)} interest · {tabOverdue ? `overdue ${fmtCountdown(loanDueAt as number, now)}` : `${fmtCountdown(loanDueAt as number, now)} left`}
+                      </p>
+                    </div>
+                    <span className="flex flex-shrink-0 items-center gap-0.5 rounded-full bg-white/20 px-2.5 py-1.5 text-[10px] font-bold">
+                      Earn it back <ChevronRight className="h-3 w-3" />
+                    </span>
                   </button>
-                </div>
+                )}
 
                 {/* Apple-Fitness style dual ring */}
                 <div className="rounded-3xl border border-stone-900/10 bg-white/70 p-5 shadow-sm">
@@ -932,6 +1208,20 @@ export default function VicesAiPage() {
                     </div>
                   </div>
                 </div>
+
+                {/* The coach — a foul-mouthed read on how you're playing. Tap to reroll. */}
+                <button
+                  onClick={() => setCoachIdx((i) => i + 1)}
+                  className="press flex items-center gap-3 rounded-2xl border border-stone-900/10 bg-white/60 px-4 py-3 text-left"
+                  aria-label="Coach says — tap for another"
+                >
+                  <span className={`flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-xl ${COACH_TINT[coachMood]}`}>
+                    <MessageCircle className="h-4 w-4" />
+                  </span>
+                  <p key={`${coachMood}-${coachIdx}`} className="flex-1 text-[12.5px] font-semibold leading-snug text-stone-700" style={{ animation: "fadeUp .3s ease" }}>
+                    {coachLine}
+                  </p>
+                </button>
 
                 {/* Weekly goal bar (Duolingo progression) */}
                 <div className="rounded-2xl border border-stone-900/10 bg-white/40 p-4">
@@ -1083,8 +1373,8 @@ export default function VicesAiPage() {
                 {/* ── VICES STORE: spend your hard-earned points ── */}
                 <h2 className={`text-xs font-bold uppercase tracking-[0.18em] ${accent.text}`}>Vices Store</h2>
 
-                {/* Wallet banner — live spendable balance, doubles as the burst origin */}
-                <div className="relative flex flex-shrink-0 items-center gap-3 overflow-hidden rounded-2xl bg-gradient-to-br from-rose-500 to-amber-500 px-4 py-3.5 text-white shadow-lg shadow-rose-500/25">
+                {/* Wallet banner — spendable balance, or the live tab when you owe */}
+                <div className={`relative flex flex-shrink-0 items-center gap-3 overflow-hidden rounded-2xl bg-gradient-to-br px-4 py-3.5 text-white shadow-lg ${onTab ? (tabOverdue ? "from-rose-600 to-red-600 shadow-rose-600/30" : "from-amber-500 to-rose-500 shadow-amber-500/25") : "from-rose-500 to-amber-500 shadow-rose-500/25"}`}>
                   {burst && (
                     <div className="pointer-events-none absolute inset-0 z-10">
                       {burst.parts.map((p) => (
@@ -1096,10 +1386,10 @@ export default function VicesAiPage() {
                       ))}
                     </div>
                   )}
-                  <Wallet className="h-6 w-6 flex-shrink-0" />
+                  {onTab ? <Receipt className="h-6 w-6 flex-shrink-0" /> : <Wallet className="h-6 w-6 flex-shrink-0" />}
                   <div className="flex-1">
-                    <p className="text-[9px] font-semibold uppercase tracking-[0.18em] text-white/80">Points to spend</p>
-                    <p key={wallet} className="text-2xl font-black leading-none tabular-nums" style={{ animation: "pop .25s ease" }}>{fmt(wallet)} pts</p>
+                    <p className="text-[9px] font-semibold uppercase tracking-[0.18em] text-white/80">{onTab ? `On the tab · ${fmtCountdown(loanDueAt as number, now)} ${tabOverdue ? "overdue" : "left"}` : "Points to spend"}</p>
+                    <p key={onTab ? tabOwed : wallet} className="text-2xl font-black leading-none tabular-nums" style={{ animation: "pop .25s ease" }}>{onTab ? `−${fmt(tabOwed)}` : fmt(wallet)} pts</p>
                   </div>
                   <ShoppingBag className="h-5 w-5 flex-shrink-0 text-white/70" />
                 </div>
@@ -1119,17 +1409,16 @@ export default function VicesAiPage() {
                             <button
                               key={v.id}
                               onClick={() => buyVice(v)}
-                              disabled={!afford}
                               style={{ animation: `fadeUp .25s ease ${vi * 30}ms both` }}
-                              className={`press relative flex items-center gap-2.5 rounded-xl border px-3 py-2.5 text-left transition-all ${afford ? "border-stone-900/10 bg-white/70 hover:bg-white hover:shadow-md" : "border-stone-900/5 bg-white/30 opacity-70"}`}
+                              className={`press relative flex items-center gap-2.5 rounded-xl border px-3 py-2.5 text-left transition-all ${afford ? "border-stone-900/10 bg-white/70 hover:bg-white hover:shadow-md" : "border-amber-500/30 bg-amber-500/5 hover:bg-amber-500/10"}`}
                             >
-                              <span className={`flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg ${afford ? "bg-rose-500/10 text-rose-600" : "bg-stone-900/5 text-stone-400"}`}>
-                                {afford ? v.icon : <Lock className="h-3.5 w-3.5" />}
+                              <span className={`flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg ${afford ? "bg-rose-500/10 text-rose-600" : "bg-amber-500/15 text-amber-600"}`}>
+                                {v.icon}
                               </span>
                               <span className="min-w-0 flex-1">
                                 <span className="block truncate text-[12px] font-semibold text-stone-800">{v.label}</span>
-                                <span className={`block text-[10px] font-bold tabular-nums ${afford ? "text-rose-600" : "text-stone-400"}`}>
-                                  {afford ? `${fmt(v.me)} pts` : `need ${fmt(v.me - netME)} more`}
+                                <span className={`block text-[10px] font-bold tabular-nums ${afford ? "text-rose-600" : "text-amber-600"}`}>
+                                  {afford ? `${fmt(v.me)} pts` : `${fmt(v.me)} pts · on tab`}
                                 </span>
                               </span>
                             </button>
@@ -1260,16 +1549,18 @@ export default function VicesAiPage() {
           </nav>
         </div>
 
-        {/* ─────────────── PURCHASE TOAST (store) ─────────────── */}
+        {/* ─────────────── ACTION TOAST (purchase / tab payoff) ─────────────── */}
         {toast && (
           <div
             key={toast.id}
             className="pointer-events-none absolute bottom-24 left-1/2 z-40 flex -translate-x-1/2 items-center gap-2 rounded-full bg-stone-900 px-4 py-2 text-white shadow-xl shadow-stone-900/30"
-            style={{ animation: "toastIn 1.6s ease forwards" }}
+            style={{ animation: "toastIn 1.8s ease forwards" }}
           >
             <ShoppingBag className="h-3.5 w-3.5 text-rose-300" />
-            <span className="text-[12px] font-semibold">Enjoy your {toast.label.toLowerCase()}</span>
-            <span className="text-[12px] font-black tabular-nums text-rose-300">−{fmt(toast.pts)} pts</span>
+            <span className="text-[12px] font-semibold">{toast.text}</span>
+            {toast.pts !== 0 && (
+              <span className="text-[12px] font-black tabular-nums text-rose-300">{toast.pts < 0 ? "−" : "+"}{fmt(Math.abs(toast.pts))} pts</span>
+            )}
           </div>
         )}
 
@@ -1322,6 +1613,115 @@ export default function VicesAiPage() {
                     </div>
                   );
                 })}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ─────────────── HISTORY SHEET (lifetime tallies) ─────────────── */}
+        {historyOpen && (
+          <div className="absolute inset-0 z-40">
+            <div className="absolute inset-0 bg-stone-900/30 backdrop-blur-sm" onClick={() => setHistoryOpen(false)} />
+            <div className="no-scrollbar absolute inset-x-0 bottom-0 max-h-[82%] overflow-y-auto rounded-t-3xl border-t border-stone-900/10 bg-[#FAF8F4]/95 p-5 backdrop-blur-xl" style={{ animation: "fadeUp .3s ease" }}>
+              <div className="mx-auto mb-4 h-1 w-10 rounded-full bg-stone-900/15" />
+              <h3 className="mb-3 text-xs font-bold uppercase tracking-[0.18em] text-stone-500">Your history · all time</h3>
+
+              {/* All-time totals */}
+              <div className="grid grid-cols-3 gap-2">
+                {([
+                  { label: "Earned", value: lifeEarned, cls: "text-emerald-600" },
+                  { label: "Spent", value: lifeSpent, cls: "text-rose-600" },
+                  { label: "Net", value: round2(lifeEarned - lifeSpent), cls: "text-stone-900" },
+                ] as const).map((s) => (
+                  <div key={s.label} className="rounded-xl border border-stone-900/10 bg-white/70 px-3 py-2.5 text-center">
+                    <p className={`text-lg font-black leading-none tabular-nums ${s.cls}`}>{fmt(s.value)}</p>
+                    <p className="mt-1 text-[8px] font-bold uppercase tracking-wider text-stone-400">{s.label} pts</p>
+                  </div>
+                ))}
+              </div>
+
+              {/* Past weeks */}
+              {weeks.length > 0 && (
+                <div className="mt-4">
+                  <p className="mb-1.5 text-[10px] font-bold uppercase tracking-[0.18em] text-stone-400">Past weeks</p>
+                  <div className="space-y-1.5">
+                    {weeks.slice(0, 6).map((w) => {
+                      const vd = VERDICTS[w.verdict];
+                      return (
+                        <div key={w.week} className="flex items-center gap-3 rounded-xl border border-stone-900/10 bg-white/60 px-3.5 py-2">
+                          <span className={`flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-lg bg-gradient-to-br ${vd.grad} text-white`}>
+                            {React.cloneElement(vd.icon as React.ReactElement, { className: "h-3.5 w-3.5" })}
+                          </span>
+                          <div className="min-w-0 flex-1">
+                            <p className="text-[12px] font-bold text-stone-800">{vd.title}</p>
+                            <p className="text-[9px] text-stone-400">Week of {w.week}</p>
+                          </div>
+                          <p className="flex-shrink-0 text-[10px] tabular-nums text-stone-400">+{fmt(w.earned)} · −{fmt(w.spent)}</p>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {/* Lifetime tallies per item */}
+              {([
+                { title: "Healthy logged", items: ALL_HABITS.filter((h) => (history[h.id] ?? 0) > 0), tint: "text-emerald-600" },
+                { title: "Vices enjoyed", items: ALL_VICES.filter((v) => (history[v.id] ?? 0) > 0), tint: "text-rose-600" },
+              ] as const).map((sec) => sec.items.length > 0 && (
+                <div key={sec.title} className="mt-4">
+                  <p className="mb-1.5 text-[10px] font-bold uppercase tracking-[0.18em] text-stone-400">{sec.title}</p>
+                  <div className="grid grid-cols-2 gap-1.5">
+                    {sec.items.map((it) => (
+                      <div key={it.id} className="flex items-center gap-2.5 rounded-xl border border-stone-900/10 bg-white/60 px-3 py-2">
+                        <span className={sec.tint}>{it.icon}</span>
+                        <div className="min-w-0">
+                          <p className="text-[13px] font-black leading-none tabular-nums text-stone-900">{fmt(history[it.id])}</p>
+                          <p className="truncate text-[8px] uppercase tracking-wider text-stone-400">{(history[it.id] ?? 0) === 1 ? it.unitOne : it.unit}</p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ))}
+
+              {lifeEarned === 0 && lifeSpent === 0 && (
+                <p className="mt-6 mb-2 text-center text-[12px] italic text-stone-400">No history yet — log a habit or grab a vice to start your tally.</p>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* ─────────────── MONDAY RECAP (verdict on the week that just ended) ─────────────── */}
+        {splashGone && recap && (
+          <div className="absolute inset-0 z-50 flex items-center justify-center p-6">
+            <div className="absolute inset-0 bg-stone-900/40 backdrop-blur-sm" onClick={() => setRecap(null)} />
+            <div className="relative w-full max-w-[300px] overflow-hidden rounded-3xl border border-stone-900/10 bg-[#FAF8F4] shadow-2xl" style={{ animation: "fadeUp .3s ease" }}>
+              <div className={`flex flex-col items-center bg-gradient-to-br ${VERDICTS[recap.verdict].grad} px-6 pb-5 pt-7 text-center text-white`}>
+                <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-white/20" style={{ animation: "pop .5s ease" }}>
+                  {VERDICTS[recap.verdict].icon}
+                </div>
+                <p className="mt-3 text-[10px] font-bold uppercase tracking-[0.2em] text-white/80">Last week&apos;s verdict</p>
+                <h3 className="text-2xl font-black leading-tight">{VERDICTS[recap.verdict].title}</h3>
+              </div>
+              <div className="p-6 text-center">
+                <p className="text-[13px] leading-relaxed text-stone-600">{VERDICTS[recap.verdict].body}</p>
+                <div className="mt-4 flex justify-center gap-4 text-center">
+                  <div>
+                    <p className="text-lg font-black tabular-nums text-emerald-600">{fmt(recap.earned)}</p>
+                    <p className="text-[8px] font-bold uppercase tracking-wider text-stone-400">Earned</p>
+                  </div>
+                  <div>
+                    <p className="text-lg font-black tabular-nums text-rose-600">{fmt(recap.spent)}</p>
+                    <p className="text-[8px] font-bold uppercase tracking-wider text-stone-400">Spent</p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setRecap(null)}
+                  className="press mt-5 w-full rounded-xl bg-stone-900 py-3 text-[13px] font-bold text-white transition-colors hover:bg-stone-700"
+                >
+                  Start the week fresh
+                </button>
               </div>
             </div>
           </div>
