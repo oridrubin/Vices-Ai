@@ -28,6 +28,7 @@ import {
   Smartphone,
   Snowflake,
   Sparkles,
+  ThermometerSun,
   Trophy,
   UserPlus,
   Users,
@@ -43,13 +44,13 @@ import {
 
 type Mode = "allowance" | "store" | "friends";
 
-type HabitCatId = "workout" | "meal" | "water" | "cold";
+type HabitCatId = "workout" | "meal" | "water" | "wellness";
 type HabitId =
   | "run" | "lift" | "hiit" | "cardio" | "sport" | "yoga"
   | "salad" | "balanced" | "protein" | "cleanswap"
-  | "water" | "cold";
+  | "water" | "sauna" | "cold";
 type ViceId =
-  | "beer" | "shot" | "drink"
+  | "beer" | "wine" | "shot" | "drink"
   | "cig" | "joint" | "edible" | "dab"
   | "porn" | "scroll"
   | "crawl" | "night" | "rave" | "bender";
@@ -122,7 +123,7 @@ const HABIT_CATS: HabitCategory[] = [
       { id: "lift",   label: "Lifting",         plural: "Sessions", unit: "sessions", unitOne: "session", me: 20, min: 1,   max: 3,  step: 1,   def: 1, icon: <Dumbbell className="w-4 h-4" /> },
       { id: "hiit",   label: "HIIT",            plural: "Sessions", unit: "sessions", unitOne: "session", me: 20, min: 1,   max: 3,  step: 1,   def: 1, icon: <Zap className="w-4 h-4" /> },
       { id: "cardio", label: "Cardio",          plural: "Sessions", unit: "sessions", unitOne: "session", me: 15, min: 1,   max: 3,  step: 1,   def: 1, icon: <Bike className="w-4 h-4" /> },
-      { id: "sport",  label: "Team Sport",      plural: "Sessions", unit: "sessions", unitOne: "session", me: 15, min: 1,   max: 3,  step: 1,   def: 1, icon: <Trophy className="w-4 h-4" /> },
+      { id: "sport",  label: "Team Sport",      plural: "Matches",  unit: "matches",  unitOne: "match",   me: 15, min: 1,   max: 3,  step: 1,   def: 1, icon: <Trophy className="w-4 h-4" /> },
       { id: "yoga",   label: "Yoga / Mobility", plural: "Sessions", unit: "sessions", unitOne: "session", me: 10, min: 1,   max: 3,  step: 1,   def: 1, icon: <PersonStanding className="w-4 h-4" /> },
     ],
   },
@@ -148,12 +149,13 @@ const HABIT_CATS: HabitCategory[] = [
     ],
   },
   {
-    id: "cold",
-    label: "Cold Plunge",
-    short: "Cold",
-    icon: <Snowflake className="w-4 h-4" />,
+    id: "wellness",
+    label: "Wellness",
+    short: "Wellness",
+    icon: <ThermometerSun className="w-4 h-4" />,
     options: [
-      { id: "cold", label: "Cold Plunge", plural: "Plunges", unit: "plunges", unitOne: "plunge", me: 5, min: 1, max: 4, step: 1, def: 1, icon: <Snowflake className="w-4 h-4" /> },
+      { id: "sauna", label: "Sauna",       plural: "Sessions", unit: "sessions", unitOne: "session", me: 5, min: 1, max: 4, step: 1, def: 1, icon: <ThermometerSun className="w-4 h-4" /> },
+      { id: "cold",  label: "Cold Plunge", plural: "Plunges",  unit: "plunges",  unitOne: "plunge",  me: 5, min: 1, max: 4, step: 1, def: 1, icon: <Snowflake className="w-4 h-4" /> },
     ],
   },
 ];
@@ -172,7 +174,8 @@ const VICE_CATEGORIES: ViceCategory[] = [
     icon: <Beer className="w-4 h-4" />,
     vices: [
       { id: "beer",  label: "Beer",           plural: "Beers",       unit: "beers",  unitOne: "beer",  me: 10, min: 1, max: 12, step: 1, def: 2, icon: <Beer className="w-4 h-4" /> },
-      { id: "shot",  label: "Shot of Liquor", plural: "Shots",       unit: "shots",  unitOne: "shot",  me: 10, min: 1, max: 10, step: 1, def: 2, icon: <Wine className="w-4 h-4" /> },
+      { id: "wine",  label: "Glass of Wine",  plural: "Glasses",     unit: "glasses", unitOne: "glass", me: 10, min: 1, max: 8, step: 1, def: 2, icon: <Wine className="w-4 h-4" /> },
+      { id: "shot",  label: "Shot of Liquor", plural: "Shots",       unit: "shots",  unitOne: "shot",  me: 10, min: 1, max: 10, step: 1, def: 2, icon: <Martini className="w-4 h-4" /> },
       { id: "drink", label: "Weed Drink",     plural: "Weed Drinks", unit: "drinks", unitOne: "drink", me: 15, min: 1, max: 8,  step: 1, def: 1, icon: <CupSoda className="w-4 h-4" /> },
     ],
   },
@@ -274,17 +277,25 @@ interface Friend {
 /** A friend with their net balance precomputed for metric scoring. */
 type Ranked = Friend & { net: number };
 
-/** Local demo friends until real account sync lands. */
+/** Local demo friends until real account sync lands. Spent never exceeds earned —
+ *  you can't go below zero — so the cohort spans pure grind to fully cashed out. */
 const SEED_FRIENDS: Friend[] = [
-  { name: "Ori",  earned: 40, spent: 35, last: "Gym Workout · 1 session · +20 pts" },
-  { name: "Maya", earned: 20, spent: 30, last: "Beer · 2 beers · -20 pts" },
-  { name: "Jake", earned: 90, spent: 15, last: "Running · 8 miles · +80 pts" },
-  { name: "Zoe",  earned: 15, spent: 70, last: "Heavy Night Out · 1 night · -60 pts" },
+  { name: "Jake", earned: 90, spent: 10, last: "Running · 8 miles · +80 pts" },     // dork — banked it all
+  { name: "Ori",  earned: 60, spent: 32, last: "Gym Workout · 1 session · +20 pts" }, // balanced — spent ~half
+  { name: "Maya", earned: 45, spent: 18, last: "Lifting · 1 session · +20 pts" },
+  { name: "Zoe",  earned: 50, spent: 48, last: "Heavy Night Out · 1 night · -60 pts" }, // degen — cashed out
 ];
 
-/** Moderation score: 100 at perfect equilibrium, 0 by ±80 pts of imbalance. */
-const moderation = (pts: number): number =>
-  Math.max(0, Math.round(100 - Math.abs(pts) * 1.25));
+/** Share of earned points that got spent on vices: 0 = banked everything (grind),
+ *  1 = cashed out every point (max indulgence). Spending is capped at earnings —
+ *  you can't go below zero — so this always lives in [0, 1]. */
+const spendRatio = (f: { earned: number; spent: number }): number =>
+  f.earned > 0 ? Math.min(f.spent / f.earned, 1) : 0;
+
+/** How active someone was this week, 0…1. A quiet week can't top any board —
+ *  you have to actually live to win, in either direction. */
+const engagement = (f: { earned: number; spent: number }): number =>
+  Math.min((f.earned + f.spent) / 40, 1);
 
 /** Status dot colour for any balance — yours or a friend's. */
 const dotFor = (pts: number): string =>
@@ -310,10 +321,10 @@ const METRICS: Metric[] = [
   {
     id: "balanced",
     label: "Balanced",
-    tagline: "Closest to even wins — extremes cost points, good or bad.",
-    unit: "pts",
+    tagline: "Spent about half of what you earned, stayed active. Peak moderation.",
+    unit: "balance",
     icon: <Scale className="w-4 h-4" />,
-    score: (f) => moderation(f.net),
+    score: (f) => Math.round((1 - Math.abs(spendRatio(f) - 0.5) * 2) * 100 * engagement(f)),
     text: "text-emerald-600",
     chipOn: "border-emerald-500 bg-emerald-500 text-white shadow-lg shadow-emerald-500/30",
     glow: "rgba(16,185,129,0.45)",
@@ -321,10 +332,10 @@ const METRICS: Metric[] = [
   {
     id: "degen",
     label: "Degen",
-    tagline: "Most points torched on vices this week. Wear it proudly. Or don't.",
-    unit: "pts burned",
+    tagline: "Cashed out nearly every point you earned on vices. Iconic. Concerning.",
+    unit: "degen",
     icon: <Skull className="w-4 h-4" />,
-    score: (f) => f.spent,
+    score: (f) => Math.round(spendRatio(f) * 100 * engagement(f)),
     text: "text-rose-600",
     chipOn: "border-rose-500 bg-rose-500 text-white shadow-lg shadow-rose-500/30",
     glow: "rgba(244,63,94,0.45)",
@@ -332,10 +343,10 @@ const METRICS: Metric[] = [
   {
     id: "dork",
     label: "Dork",
-    tagline: "Most points banked from good habits. Insufferable, honestly.",
-    unit: "pts earned",
+    tagline: "Earned a pile and barely spent it. Insufferably disciplined.",
+    unit: "grind",
     icon: <Sparkles className="w-4 h-4" />,
-    score: (f) => f.earned,
+    score: (f) => Math.round((1 - spendRatio(f)) * 100 * engagement(f)),
     text: "text-sky-600",
     chipOn: "border-sky-500 bg-sky-500 text-white shadow-lg shadow-sky-500/30",
     glow: "rgba(14,165,233,0.45)",
@@ -421,10 +432,22 @@ export default function VicesAiPage() {
       }
     } catch { /* corrupted storage — start clean */ }
     try {
-      const raw = localStorage.getItem("vices-friends-v2");
+      const raw = localStorage.getItem("vices-friends-v3");
       if (raw) {
         const p = JSON.parse(raw);
-        if (Array.isArray(p) && p.every((f) => typeof f.earned === "number")) setFriends(p);
+        if (p && Array.isArray(p.friends)) {
+          if (p.week === weekOf()) {
+            setFriends(p.friends);
+          } else {
+            // New week — the leaderboard resets with the ledger. Refresh the demo
+            // cohort to its seed so there's still a board to climb; zero out the
+            // weekly stats of anyone you added yourself.
+            setFriends(p.friends.map((f: Friend) => {
+              const seed = SEED_FRIENDS.find((s) => s.name === f.name);
+              return seed ? { ...seed } : { ...f, earned: 0, spent: 0, last: "No logs yet" };
+            }));
+          }
+        }
       }
     } catch { /* corrupted storage — keep seeds */ }
   }, []);
@@ -434,7 +457,7 @@ export default function VicesAiPage() {
   }, [earnedME, spentME, lastEntry]);
   useEffect(() => {
     if (!hydrated.current) return;
-    localStorage.setItem("vices-friends-v2", JSON.stringify(friends));
+    localStorage.setItem("vices-friends-v3", JSON.stringify({ week: weekOf(), friends }));
   }, [friends]);
   // Declared last so it runs after the first pass of the save effects above —
   // they skip while false, then persist normally once the loaded state lands.
@@ -942,7 +965,7 @@ export default function VicesAiPage() {
               <h3 className="mb-3 text-xs font-bold uppercase tracking-[0.18em] text-stone-500">What did you do?</h3>
               <div className="space-y-2">
                 {HABIT_CATS.map((cat) => {
-                  // Single-option categories (Water, Cold) select straight from the row.
+                  // Single-option categories (Water) select straight from the row.
                   const single = cat.options.length === 1;
                   const open = openHabitCat === cat.id;
                   return (
