@@ -388,6 +388,22 @@ const greeting = (): string => {
   return h < 5 ? "Late night" : h < 12 ? "Good morning" : h < 18 ? "Good afternoon" : "Good evening";
 };
 
+/** One-tap "quick add" habits on the Earn page — MyFitnessPal-style fast entry. */
+const QUICK_LOG: { id: HabitId; qty: number }[] = [
+  { id: "run",   qty: 1 },
+  { id: "lift",  qty: 1 },
+  { id: "sauna", qty: 1 },
+  { id: "salad", qty: 1 },
+];
+
+/** First-run onboarding — four quick cards, skippable at any point. */
+const ONBOARD: { icon: React.ReactNode; title: string; body: string }[] = [
+  { icon: <Scale className="h-7 w-7" />,       title: "Welcome to Vices.ai", body: "Do healthy things, bank points, then spend them on your vices — guilt-free." },
+  { icon: <Dumbbell className="h-7 w-7" />,    title: "Earn your allowance", body: "Log a run, a workout, a sauna — every healthy move banks points toward your weekly goal." },
+  { icon: <ShoppingBag className="h-7 w-7" />, title: "Spend in the Store",  body: "Cash your points in on the good stuff. A beer, a night out — you earned it." },
+  { icon: <Users className="h-7 w-7" />,       title: "Stay balanced",       body: "Too much grind or too much vice both cost you. Keep it even and climb the leaderboard." },
+];
+
 /** Confetti palettes for the log-entry burst. */
 const CONFETTI_GOOD = ["#10b981", "#34d399", "#0ea5e9", "#a3e635"];
 const CONFETTI_BAD = ["#f59e0b", "#fb923c", "#f43f5e", "#facc15"];
@@ -415,6 +431,9 @@ export default function VicesAiPage() {
    *  the weekly point ledger, the streak carries across weeks. */
   const [streak, setStreak] = useState<number>(0);
   const [lastLogDay, setLastLogDay] = useState<string | null>(null);
+
+  /** First-run tutorial: current step, or -1 once finished/skipped. */
+  const [onboardStep, setOnboardStep] = useState<number>(-1);
 
   /** Store: a transient "you bought X" toast after a purchase. */
   const [toast, setToast] = useState<{ id: number; label: string; pts: number } | null>(null);
@@ -504,6 +523,12 @@ export default function VicesAiPage() {
     if (!hydrated.current) return;
     localStorage.setItem("vices-streak-v1", JSON.stringify({ streak, lastLogDay }));
   }, [streak, lastLogDay]);
+  // Show the tutorial once, ever — first run with no stored flag.
+  useEffect(() => {
+    try {
+      if (!localStorage.getItem("vices-onboarded-v1")) setOnboardStep(0);
+    } catch { /* ignore — just skip onboarding */ }
+  }, []);
   useEffect(() => {
     if (!hydrated.current) return;
     localStorage.setItem("vices-friends-v3", JSON.stringify({ week: weekOf(), friends }));
@@ -632,10 +657,13 @@ export default function VicesAiPage() {
   };
 
   /** Allowance: bank points for a logged habit. */
-  const logEntry = (): void => {
-    setEarnedME((prev) => round2(prev + totalME));
+  /** Bank points for any habit + quantity. Shared by the main Log button and the
+   *  one-tap Quick Add chips. */
+  const bankHabit = (h: BarterItem<HabitId>, n: number): void => {
+    const pts = round2(n * h.me);
+    setEarnedME((prev) => round2(prev + pts));
     setLastEntry(
-      `${item.label} · ${plur(qty, item.unitOne, item.unit)} · +${fmt(totalME)} pts · ${new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`,
+      `${h.label} · ${plur(n, h.unitOne, h.unit)} · +${fmt(pts)} pts · ${new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`,
     );
     // Advance the streak: +1 if yesterday was the last log, reset to 1 if a gap,
     // unchanged if you already logged today.
@@ -648,6 +676,14 @@ export default function VicesAiPage() {
       setLastLogDay(todayStr);
     }
     fireBurst(true);
+  };
+
+  const logEntry = (): void => bankHabit(item, qty);
+
+  /** Close the tutorial and remember it so it never shows again. */
+  const dismissOnboard = (): void => {
+    setOnboardStep(-1);
+    try { localStorage.setItem("vices-onboarded-v1", "1"); } catch { /* ignore */ }
   };
 
   /** Store: spend points on a vice. Locked items (can't afford) no-op. */
@@ -744,6 +780,42 @@ export default function VicesAiPage() {
             <p className="mt-2 text-sm text-stone-500">Earn your vices the easy way.</p>
             <div className="mt-8 h-1 w-40 overflow-hidden rounded-full bg-stone-900/10">
               <div className="h-full rounded-full bg-gradient-to-r from-emerald-500 to-teal-400" style={{ animation: "loadbar 2.2s ease-out forwards" }} />
+            </div>
+          </div>
+        )}
+
+        {/* ─────────────── FIRST-RUN TUTORIAL (4 steps, skip anytime) ─────────────── */}
+        {splashGone && onboardStep >= 0 && onboardStep < ONBOARD.length && (
+          <div className="absolute inset-0 z-50 flex items-center justify-center p-6">
+            {/* Tap the backdrop to dismiss */}
+            <div className="absolute inset-0 bg-stone-900/40 backdrop-blur-sm" onClick={dismissOnboard} />
+            <div
+              key={onboardStep}
+              className="relative w-full max-w-[300px] rounded-3xl border border-stone-900/10 bg-[#FAF8F4] p-6 shadow-2xl"
+              style={{ animation: "fadeUp .3s ease" }}
+            >
+              <button
+                onClick={dismissOnboard}
+                className="absolute right-4 top-4 text-[10px] font-bold uppercase tracking-[0.16em] text-stone-400 transition-colors hover:text-stone-700"
+              >
+                Skip
+              </button>
+              <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-stone-900 text-[#FAF8F4] shadow-md shadow-stone-900/20">
+                {ONBOARD[onboardStep].icon}
+              </div>
+              <h3 className="mt-4 text-lg font-black leading-tight text-stone-900">{ONBOARD[onboardStep].title}</h3>
+              <p className="mt-1.5 text-[13px] leading-relaxed text-stone-500">{ONBOARD[onboardStep].body}</p>
+              <div className="mt-5 flex items-center gap-1.5">
+                {ONBOARD.map((_, i) => (
+                  <span key={i} className={`h-1.5 rounded-full transition-all ${i === onboardStep ? "w-5 bg-stone-900" : "w-1.5 bg-stone-900/20"}`} />
+                ))}
+              </div>
+              <button
+                onClick={() => (onboardStep === ONBOARD.length - 1 ? dismissOnboard() : setOnboardStep((s) => s + 1))}
+                className="press mt-5 w-full rounded-xl bg-stone-900 py-3 text-[13px] font-bold text-white transition-colors hover:bg-stone-700"
+              >
+                {onboardStep === ONBOARD.length - 1 ? "Let's go" : "Next"}
+              </button>
             </div>
           </div>
         )}
@@ -1112,17 +1184,46 @@ export default function VicesAiPage() {
                   </p>
                 </div>
 
-                {/* Slim weekly context pinned to the bottom */}
-                <div className="mt-auto flex flex-shrink-0 items-center justify-between px-1 text-[10px] text-stone-400">
-                  <span className="font-semibold uppercase tracking-[0.18em]">This week</span>
-                  <span className="tabular-nums">
-                    <span className="font-bold text-emerald-600">+{fmt(earnedME)}</span> earned&nbsp;·&nbsp;
-                    <span className="font-bold text-amber-600">−{fmt(spentME)}</span> spent
-                  </span>
+                {/* Quick add — one-tap logging for your go-to habits */}
+                <div>
+                  <p className="mb-2 text-[9px] font-semibold uppercase tracking-[0.18em] text-stone-400">Quick add</p>
+                  <div className="grid grid-cols-4 gap-2">
+                    {QUICK_LOG.map(({ id, qty: n }) => {
+                      const h = ALL_HABITS.find((x) => x.id === id) as BarterItem<HabitId>;
+                      return (
+                        <button
+                          key={id}
+                          onClick={() => bankHabit(h, n)}
+                          className="press flex flex-col items-center gap-1 rounded-xl border border-stone-900/10 bg-white/60 py-2.5 transition-colors hover:bg-white hover:shadow-sm"
+                        >
+                          <span className="text-emerald-600">{h.icon}</span>
+                          <span className="text-[10px] font-bold leading-none text-stone-700">{h.label.split(" ")[0]}</span>
+                          <span className="text-[9px] font-bold tabular-nums text-emerald-600">+{fmt(n * h.me)}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* This week — compact progress toward the weekly goal */}
+                <div className="rounded-2xl border border-stone-900/10 bg-white/40 p-4">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[9px] font-semibold uppercase tracking-[0.18em] text-stone-400">This week</span>
+                    <span className="text-[10px] tabular-nums">
+                      <span className="font-bold text-emerald-600">+{fmt(earnedME)}</span> earned&nbsp;·&nbsp;
+                      <span className="font-bold text-amber-600">−{fmt(spentME)}</span> spent
+                    </span>
+                  </div>
+                  <div className="mt-2.5 h-2 overflow-hidden rounded-full bg-stone-900/10">
+                    <div className="h-full rounded-full bg-gradient-to-r from-emerald-500 to-teal-400" style={{ width: `${goalProgress * 100}%`, transition: "width .6s ease" }} />
+                  </div>
+                  <p className="mt-1.5 text-[9px] text-stone-400">
+                    {goalProgress >= 1 ? "Weekly goal smashed — enjoy yourself." : `${fmt(WEEKLY_GOAL - earnedME)} pts to your weekly goal.`}
+                  </p>
                 </div>
 
                 {/* Log button with confetti burst on click */}
-                <div className="relative flex-shrink-0">
+                <div className="relative mt-auto flex-shrink-0">
                   {burst && (
                     <div className="pointer-events-none absolute inset-x-0 -top-2 bottom-0 z-10">
                       {burst.parts.map((p) => (
