@@ -12,7 +12,6 @@ import {
   ChevronRight,
   Check,
   Cigarette,
-  Crown,
   CupSoda,
   Droplets,
   Dumbbell,
@@ -27,15 +26,18 @@ import {
   MessageCircle,
   PersonStanding,
   Receipt,
+  RotateCcw,
   Salad,
   Scale,
+  Settings,
+  Share2,
   ShoppingBag,
   Skull,
   Smartphone,
   Snowflake,
-  Sparkles,
   Star,
   ThermometerSun,
+  Trash2,
   TrendingUp,
   Trophy,
   UserPlus,
@@ -214,13 +216,24 @@ const VICE_CATEGORIES: ViceCategory[] = [
     vices: [
       { id: "crawl",  label: "Bar Crawl",       plural: "Bar Crawls",   unit: "crawls",  unitOne: "crawl",  me: 50, min: 1, max: 3, step: 1, def: 1, icon: <Beer className="w-4 h-4" /> },
       { id: "night",  label: "Heavy Night Out", plural: "Heavy Nights", unit: "nights",  unitOne: "night",  me: 60, min: 1, max: 3, step: 1, def: 1, icon: <Martini className="w-4 h-4" /> },
-      { id: "rave",   label: "Rave / Festival", plural: "Raves",        unit: "raves",   unitOne: "rave",   me: 70, min: 1, max: 3, step: 1, def: 1, icon: <Sparkles className="w-4 h-4" /> },
+      { id: "rave",   label: "Rave / Festival", plural: "Raves",        unit: "raves",   unitOne: "rave",   me: 70, min: 1, max: 3, step: 1, def: 1, icon: <Zap className="w-4 h-4" /> },
       { id: "bender", label: "Full Bender",     plural: "Benders",      unit: "benders", unitOne: "bender", me: 90, min: 1, max: 2, step: 1, def: 1, icon: <Flame className="w-4 h-4" /> },
     ],
   },
 ];
 
 const ALL_VICES: BarterItem<ViceId>[] = VICE_CATEGORIES.flatMap((c) => c.vices);
+
+/** Store colour identity per vice category — each aisle gets its own energy so
+ *  the shelf reads like a candy store, not a spreadsheet. Full literal class
+ *  strings (no interpolation) so Tailwind keeps them. */
+interface StoreTheme { label: string; tile: string; face: string; shadow: string; }
+const STORE_THEME: Record<string, StoreTheme> = {
+  drinks:  { label: "text-[#E6B65A]",   tile: "bg-gold",        face: "border-[#2A2F36] bg-[#1C1F24] hover:bg-[#23272E]", shadow: "" },
+  smoke:   { label: "text-[#5FD08A]", tile: "bg-[#2FB85C]", face: "border-[#2A2F36] bg-[#1C1F24] hover:bg-[#23272E]", shadow: "" },
+  digital: { label: "text-[#6FC0CC]",   tile: "bg-ocean",       face: "border-[#2A2F36] bg-[#1C1F24] hover:bg-[#23272E]", shadow: "" },
+  nights:  { label: "text-[#C98AB0]",   tile: "bg-plum",        face: "border-[#2A2F36] bg-[#1C1F24] hover:bg-[#23272E]", shadow: "" },
+};
 
 /** Format a number cleanly: integers stay whole, fractions get one decimal. */
 const fmt = (n: number): string =>
@@ -312,20 +325,20 @@ interface Verdict {
 
 const VERDICTS: Record<VerdictId, Verdict> = {
   quiet: {
-    id: "quiet", title: "Quiet Week", body: "Barely logged a thing. No grind, no vice — show up next week.",
-    icon: <Hourglass className="h-7 w-7" />, grad: "from-stone-500 to-stone-700", text: "text-stone-600",
+    id: "quiet", title: "Quiet week", body: "You barely logged anything this week. Try to log a few things next week.",
+    icon: <Hourglass className="h-7 w-7" />, grad: "bg-[#23272E]0", text: "text-[#AEB4BC]",
   },
   dork: {
-    id: "dork", title: "Super Dork Week", body: "You earned a mountain and spent jack. Drink a beer, you absolute dork.",
-    icon: <Sparkles className="h-7 w-7" />, grad: "from-sky-500 to-indigo-500", text: "text-sky-600",
+    id: "dork", title: "Dork week", body: "You earned a lot and spent almost none of it. It's fine to spend some.",
+    icon: <TrendingUp className="h-7 w-7" />, grad: "bg-gold", text: "text-[#E6B65A]",
   },
   balanced: {
-    id: "balanced", title: "Balanced Week", body: "Earned hard, spent smart, stayed even. This is the whole point.",
-    icon: <Scale className="h-7 w-7" />, grad: "from-emerald-500 to-teal-500", text: "text-emerald-600",
+    id: "balanced", title: "Balanced week", body: "You earned and spent about the same amount. That's the goal.",
+    icon: <Scale className="h-7 w-7" />, grad: "bg-[#1FD173]", text: "text-[#3BE08C]",
   },
   degen: {
-    id: "degen", title: "Degen Week", body: "You spent more than you earned and dipped into the tab. Iconic. Concerning.",
-    icon: <Skull className="h-7 w-7" />, grad: "from-rose-500 to-amber-500", text: "text-rose-600",
+    id: "degen", title: "Degen week", body: "You spent more than you earned and went on the tab. Earn it back next week.",
+    icon: <Skull className="h-7 w-7" />, grad: "bg-[#F0524B]", text: "text-[#FF6B66]",
   },
 };
 
@@ -393,7 +406,7 @@ const engagement = (f: { earned: number; spent: number }): number =>
 
 /** Status dot colour for any balance — yours or a friend's. */
 const dotFor = (pts: number): string =>
-  pts > 2.5 ? "bg-emerald-500" : pts < -2.5 ? "bg-amber-400" : "bg-stone-300";
+  pts > 2.5 ? "bg-[#1FD173]" : pts < -2.5 ? "bg-[#F0524B]" : "bg-[#565B62]";
 
 type MetricId = "balanced" | "degen" | "dork";
 
@@ -415,35 +428,35 @@ const METRICS: Metric[] = [
   {
     id: "balanced",
     label: "Balanced",
-    tagline: "Spent just about what you earned — banked it, then enjoyed it. Peak moderation.",
+    tagline: "Spent about what you earned. The closer to even, the higher the score.",
     unit: "balance",
     icon: <Scale className="w-4 h-4" />,
     score: (f) => Math.round(moderationOf(f) * 100 * engagement(f)),
-    text: "text-emerald-600",
-    chipOn: "border-emerald-500 bg-emerald-500 text-white shadow-lg shadow-emerald-500/30",
-    glow: "rgba(16,185,129,0.45)",
+    text: "text-[#3BE08C]",
+    chipOn: "border-[#1FD173] bg-[#1FD173] text-white",
+    glow: "",
   },
   {
     id: "degen",
     label: "Degen",
-    tagline: "Spent more than you banked and leaned on the tab. Iconic. Concerning.",
+    tagline: "Spent more than they earned and leaned on the tab.",
     unit: "degen",
     icon: <Skull className="w-4 h-4" />,
     score: (f) => Math.round(Math.min(spendRatio(f) / 2, 1) * 100 * engagement(f)),
-    text: "text-rose-600",
-    chipOn: "border-rose-500 bg-rose-500 text-white shadow-lg shadow-rose-500/30",
-    glow: "rgba(244,63,94,0.45)",
+    text: "text-[#FF6B66]",
+    chipOn: "border-[#F0524B] bg-[#F0524B] text-white",
+    glow: "",
   },
   {
     id: "dork",
     label: "Dork",
-    tagline: "Earned a pile and barely spent it. Insufferably disciplined.",
+    tagline: "Earned a lot and spent little. Disciplined to a fault.",
     unit: "grind",
-    icon: <Sparkles className="w-4 h-4" />,
+    icon: <TrendingUp className="w-4 h-4" />,
     score: (f) => Math.round(Math.max(0, 1 - spendRatio(f)) * 100 * engagement(f)),
-    text: "text-sky-600",
-    chipOn: "border-sky-500 bg-sky-500 text-white shadow-lg shadow-sky-500/30",
-    glow: "rgba(14,165,233,0.45)",
+    text: "text-[#E6B65A]",
+    chipOn: "border-gold bg-gold text-white",
+    glow: "",
   },
 ];
 
@@ -486,37 +499,34 @@ type CoachBucket = "start" | "dork" | "balanced" | "tab" | "loose" | "neutral";
 
 const COACH: Record<CoachBucket, string[]> = {
   start: [
-    "You haven't done shit. Move your ass before you earn anything.",
-    "Zero logged. Get off your ass and sweat, you lazy fuck.",
-    "Empty. Do something good or fuck off and come back later.",
+    "Nothing logged yet. Add a workout or a meal to start earning points.",
+    "You have no points yet. Log something healthy to get going.",
+    "Empty for now. Earn a few points before you spend.",
   ],
   dork: [
-    "You're doing too much — drink a beer, you fucking dork.",
-    "Sitting on a pile of points doing fuck-all. Spend it, dipshit.",
-    "Stop grinding and have a damn drink. Nobody's impressed, dork.",
-    "This is a vices app, not a fucking monastery. Go ruin yourself.",
-    "All this discipline and zero fun. You're insufferable. Drink something.",
+    "You've earned a lot and spent almost nothing. It's fine to spend some.",
+    "Plenty of points banked. Go enjoy one of your vices.",
+    "You're well ahead. Spending a little is the whole idea.",
   ],
   balanced: [
-    "Spent what you earned. Annoyingly balanced, you smug bastard.",
-    "Dead even. Disgusting. Don't get cocky, dickhead.",
-    "Earned it, blew it, balanced as hell. Show-off prick.",
+    "You've spent about what you earned. That's the goal.",
+    "Earned and spent are close to even. Good balance.",
+    "Nicely balanced this week.",
   ],
   tab: [
-    "You're on the fucking tab, genius. Earn it back before it eats you.",
-    "Spending money you don't have like a true idiot. Run it off.",
-    "Broke and reckless. Clock's ticking, dumbass — go sweat.",
-    "You overdid it, champ. Pay your damn debts before they bite.",
+    "You're on the tab. Earn points back before the interest grows.",
+    "You spent more than you earned. Log a workout to pay it down.",
+    "You owe points. Earn some back soon.",
   ],
   loose: [
-    "Slow the fuck down, you animal. Log a salad before you die.",
-    "Your liver's writing its will. Go earn some shit back.",
-    "Spending like you've got a death wish. Easy, killer.",
+    "You're spending faster than you earn. Ease up or earn more.",
+    "Spending is outpacing earning. Add a healthy habit.",
+    "Slow down, or bank some points back first.",
   ],
   neutral: [
-    "Eh. Earn more or sin more — do something, you bore.",
-    "Coasting like a coward. Pick a lane, dork.",
-    "Mediocre. Go be great or go be bad. Your call, champ.",
+    "Quiet so far. Earn or spend to move your balance.",
+    "Not much logged. Add a habit or a vice.",
+    "Log something to update your balance.",
   ],
 };
 
@@ -533,12 +543,12 @@ const coachBucket = (earned: number, spent: number, onTab: boolean): CoachBucket
 
 /** Icon-bubble tint per coach mood. */
 const COACH_TINT: Record<CoachBucket, string> = {
-  start: "bg-emerald-500/10 text-emerald-600",
-  dork: "bg-sky-500/10 text-sky-600",
-  balanced: "bg-emerald-500/10 text-emerald-600",
-  tab: "bg-amber-500/10 text-amber-600",
-  loose: "bg-rose-500/10 text-rose-600",
-  neutral: "bg-stone-900/5 text-stone-500",
+  start: "bg-[#1FD173]/15 text-[#3BE08C]",
+  dork: "bg-gold/10 text-[#E6B65A]",
+  balanced: "bg-[#1FD173]/15 text-[#3BE08C]",
+  tab: "bg-[#F0524B]/15 text-[#FF6B66]",
+  loose: "bg-[#F0524B]/15 text-[#FF6B66]",
+  neutral: "bg-[#252A30] text-[#AEB4BC]",
 };
 
 /** First-run onboarding — four quick cards, skippable at any point. */
@@ -550,8 +560,8 @@ const ONBOARD: { icon: React.ReactNode; title: string; body: string }[] = [
 ];
 
 /** Confetti palettes for the log-entry burst. */
-const CONFETTI_GOOD = ["#10b981", "#34d399", "#0ea5e9", "#a3e635"];
-const CONFETTI_BAD = ["#f59e0b", "#fb923c", "#f43f5e", "#facc15"];
+const CONFETTI_GOOD = ["#1FD173", "#34d399", "#0ea5e9", "#a3e635"];
+const CONFETTI_BAD = ["#f59e0b", "#fb923c", "#3B82F6", "#facc15"];
 
 /** One in-flight log celebration: a particle shower off the log button. */
 interface Burst {
@@ -586,6 +596,9 @@ export default function VicesAiPage() {
   /** Which coach line to show — bumped on every log/buy and on tap to reroll. */
   const [coachIdx, setCoachIdx] = useState<number>(0);
 
+  /** A vice tapped in the Store that would push you into debt — awaits a yes/no. */
+  const [pendingBuy, setPendingBuy] = useState<BarterItem<ViceId> | null>(null);
+
   /** Weekly point totals — earned by habits, spent on vices. Net is derived. */
   const [earnedME, setEarnedME] = useState<number>(0);
   const [spentME, setSpentME] = useState<number>(0);
@@ -599,6 +612,10 @@ export default function VicesAiPage() {
   const [weeks, setWeeks] = useState<WeekRecord[]>([]);
   const [historyOpen, setHistoryOpen] = useState<boolean>(false);
 
+  /** Settings sheet + a two-tap arm so a reset can't fire by accident. */
+  const [settingsOpen, setSettingsOpen] = useState<boolean>(false);
+  const [confirmReset, setConfirmReset] = useState<string | null>(null);
+
   /** The tab: when set, you owe money and the 36-hour clock is running. */
   const [loanDueAt, setLoanDueAt] = useState<number | null>(null);
   /** Ticks once a second while the tab is open so the countdown stays live. */
@@ -606,6 +623,9 @@ export default function VicesAiPage() {
 
   /** Monday recap modal — set on load when a finished week is detected. */
   const [recap, setRecap] = useState<WeekRecord | null>(null);
+
+  /** Shareable "Your Week, Wrapped" card — openable any time from the dashboard. */
+  const [wrappedOpen, setWrappedOpen] = useState<boolean>(false);
 
   /** In-flight log celebration (confetti + floating delta). */
   const [burst, setBurst] = useState<Burst | null>(null);
@@ -804,10 +824,10 @@ export default function VicesAiPage() {
   // ── Life Balance status (three glowing-dot states) ──────────────────────
   const status =
     netME > 2.5
-      ? { label: "Vitality Surplus", dot: "bg-emerald-500", text: "text-emerald-600", glow: "shadow-[0_0_8px_rgba(16,185,129,0.5)]" }
+      ? { label: "Ahead",  dot: "bg-[#1FD173]", text: "text-[#3BE08C]", glow: "" }
       : netME < -2.5
-      ? { label: "Karma Deficit",    dot: "bg-amber-400",   text: "text-amber-600",   glow: "shadow-[0_0_8px_rgba(251,191,36,0.5)]" }
-      : { label: "Neutral Zone",     dot: "bg-stone-300",   text: "text-stone-500",   glow: "shadow-[0_0_8px_rgba(214,211,209,0.6)]" };
+      ? { label: "Behind", dot: "bg-[#F0524B]",    text: "text-[#FF6B66]",    glow: "" }
+      : { label: "Even",   dot: "bg-[#7B818A]",   text: "text-[#8B9099]",   glow: "" };
 
   // ── Dashboard rings (Apple-Fitness style) ───────────────────────────────
   //  Outer ring = progress toward this week's earn goal; inner = how much of
@@ -815,61 +835,11 @@ export default function VicesAiPage() {
   const goalProgress = Math.min(earnedME / WEEKLY_GOAL, 1);
   const burnProgress = earnedME > 0 ? Math.min(spentME / earnedME, 1) : 0;
 
-  // ── "For You" recommendations (Spotify / Uber-Eats reward cards) ─────────
-  const recs = useMemo<Rec[]>(() => {
-    const out: Rec[] = [];
-    // Best reward you can claim right now — the Uber-Eats "claim it" moment.
-    const affordable = ALL_VICES.filter((v) => wallet >= v.me).sort((a, b) => b.me - a.me);
-    if (affordable.length) {
-      const v = affordable[0];
-      out.push({
-        key: `claim-${v.id}`, tag: "Ready to claim", title: v.label, sub: `${fmt(v.me)} pts · you earned this`,
-        icon: v.icon, grad: "from-rose-500 to-amber-500", cta: "Claim it", onTap: () => setMode("store"),
-      });
-    }
-    // The next reward just out of reach — the carrot that pulls you back to Earn.
-    const locked = ALL_VICES.filter((v) => wallet < v.me).sort((a, b) => a.me - b.me);
-    if (locked.length) {
-      const v = locked[0];
-      out.push({
-        key: `almost-${v.id}`, tag: "Almost there", title: v.label, sub: `${fmt(v.me - wallet)} pts to unlock`,
-        icon: v.icon, grad: "from-violet-500 to-indigo-500", cta: "Earn it", onTap: () => setMode("allowance"),
-      });
-    }
-    // Streak nudge — Duolingo's "don't break the chain."
-    out.push({
-      key: "streak",
-      tag: streak > 0 ? `${streak}-day streak` : "Start a streak",
-      title: streak > 0 ? "Keep it alive" : "Log today",
-      sub: streak > 0 ? "Earn to extend it" : "One habit starts it",
-      icon: <Flame className="h-4 w-4" />, grad: "from-orange-500 to-rose-500", cta: "Earn", onTap: () => setMode("allowance"),
-    });
-    // Quick win — a one-tap top-up suggestion.
-    out.push({
-      key: "topup", tag: "Quick win", title: "Hit the sauna", sub: "+5 pts in one tap",
-      icon: <ThermometerSun className="h-4 w-4" />, grad: "from-emerald-500 to-teal-500", cta: "Log it",
-      onTap: () => { setHabitId("sauna"); setHabitQty(1); setMode("allowance"); },
-    });
-    return out;
-  }, [wallet, streak]);
 
   // ── Actions ─────────────────────────────────────────────────────────────
   /** Shower of particles off whatever just got tapped (green = earn, warm = spend). */
-  const fireBurst = (good: boolean): void => {
-    const palette = good ? CONFETTI_GOOD : CONFETTI_BAD;
-    const id = Date.now();
-    setBurst({
-      id,
-      parts: Array.from({ length: 14 }, (_, i) => ({
-        k: `${id}-${i}`,
-        dx: `${Math.round((Math.random() * 2 - 1) * 130)}px`,
-        dy: `${Math.round(-30 - Math.random() * 110)}px`,
-        c: palette[i % palette.length],
-        d: `${Math.round(Math.random() * 120)}ms`,
-      })),
-    });
-    window.setTimeout(() => setBurst((b) => (b && b.id === id ? null : b)), 950);
-  };
+  // Confetti removed — flat, plain interface.
+  const fireBurst = (_good: boolean): void => {};
 
   /** Bank points for any habit + quantity. Shared by the main Log button and the
    *  one-tap Quick Add chips. Also pays off the tab (with interest) when the
@@ -914,6 +884,24 @@ export default function VicesAiPage() {
   const dismissOnboard = (): void => {
     setOnboardStep(-1);
     try { localStorage.setItem("vices-onboarded-v1", "1"); } catch { /* ignore */ }
+  };
+
+  /** Share a week's recap — native share sheet where supported, clipboard otherwise.
+   *  Powers both the always-on Wrapped card and the Monday recap. */
+  const shareWeek = async (earned: number, spent: number): Promise<void> => {
+    const vd = VERDICTS[weekVerdict(earned, spent)];
+    const text = `My Vices.ai week — ${vd.title}. Earned ${fmt(earned)} points, spent ${fmt(spent)}${streak > 0 ? `, ${streak}-day streak` : ""}. vices.ai`;
+    try {
+      const nav = typeof navigator !== "undefined" ? (navigator as Navigator & { share?: (d: { title: string; text: string }) => Promise<void> }) : undefined;
+      if (nav?.share) {
+        await nav.share({ title: "My Vices.ai Week", text });
+      } else if (nav?.clipboard) {
+        await nav.clipboard.writeText(text);
+        const id = Date.now();
+        setToast({ id, text: "Copied — paste it anywhere", pts: 0 });
+        window.setTimeout(() => setToast((t) => (t && t.id === id ? null : t)), 1800);
+      }
+    } catch { /* user dismissed the share sheet */ }
   };
 
   // ── Swipe between tabs (touch) ──────────────────────────────────────────
@@ -961,6 +949,12 @@ export default function VicesAiPage() {
     fireBurst(false);
   };
 
+  /** Store tap: buy outright if you can afford it, otherwise ask before the tab. */
+  const requestBuy = (v: BarterItem<ViceId>): void => {
+    if (spentME + v.me > earnedME) setPendingBuy(v);
+    else buyVice(v);
+  };
+
   /** Pick a specific habit from the sheet → set it and close. */
   const selectHabit = (h: BarterItem<HabitId>): void => {
     setHabitId(h.id);
@@ -974,74 +968,81 @@ export default function VicesAiPage() {
     setHabitPickerOpen(true);
   };
 
-  // ── Mode-dependent accent classes (vibrant on eggshell) ─────────────────
-  const accent = isAllowance
-    ? { text: "text-emerald-600", slider: "vslider-emerald", chip: "bg-emerald-500/10 border-emerald-500/40 text-emerald-700", btn: "bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 shadow-lg shadow-emerald-500/30" }
-    : isStore
-    ? { text: "text-rose-600",    slider: "vslider-amber",   chip: "bg-rose-500/10 border-rose-500/40 text-rose-700",          btn: "bg-gradient-to-r from-rose-500 to-amber-500 hover:from-rose-400 hover:to-amber-400 shadow-lg shadow-rose-500/30" }
-    : { text: "text-stone-600",   slider: "vslider-sky",     chip: "bg-stone-900/10 border-stone-900/20 text-stone-700",       btn: "bg-stone-900 hover:bg-stone-700 shadow-lg shadow-stone-900/20" };
+  // ── Resets (Settings) ───────────────────────────────────────────────────
+  /** Wipe this week's ledger — points, tab, last move — keep all-time history. */
+  const resetWeek = (): void => { setEarnedME(0); setSpentME(0); setLastEntry(null); setLoanDueAt(null); };
+  /** Set the daily streak back to zero. */
+  const resetStreak = (): void => { setStreak(0); setLastLogDay(null); };
+  /** Erase lifetime tallies and every archived week. */
+  const resetHistory = (): void => { setHistory({}); setLifeEarned(0); setLifeSpent(0); setWeeks([]); };
+  /** Full wipe — like a fresh install (friends fall back to the demo cohort). */
+  const resetAll = (): void => { resetWeek(); resetStreak(); resetHistory(); setFriends(SEED_FRIENDS); setRecap(null); setCoachIdx(0); };
 
-  const glass = "rounded-2xl border border-stone-900/10 bg-white/60 backdrop-blur-md shadow-sm";
+  /** Two-tap guard: first tap arms a reset, second within 3s runs it. */
+  const armOrRun = (id: string, fn: () => void): void => {
+    if (confirmReset === id) {
+      fn();
+      setConfirmReset(null);
+      setSettingsOpen(false);
+      const tid = Date.now();
+      setToast({ id: tid, text: "Reset done", pts: 0 });
+      window.setTimeout(() => setToast((t) => (t && t.id === tid ? null : t)), 1400);
+    } else {
+      setConfirmReset(id);
+      window.setTimeout(() => setConfirmReset((c) => (c === id ? null : c)), 3000);
+    }
+  };
+
+  // ── Mode-dependent accent classes (vibrant on eggshell) ─────────────────
+  const accent = {
+    text: "text-[#3BE08C]",
+    slider: "",
+    chip: "border-[#1FD173] bg-[#1FD173]/15 text-[#3BE08C]",
+    btn: "bg-[#1FD173] hover:bg-[#16B863]",
+  };
+
+  const glass = "rounded-xl border border-[#2A2F36] bg-[#1C1F24]";
 
   // ══════════════════════════════════════════════════════════════════════
   //  RENDER
   // ══════════════════════════════════════════════════════════════════════
   return (
-    <div className="relative min-h-dvh w-full bg-[#EDE9E1] font-sans text-stone-800 antialiased lg:flex lg:items-center lg:justify-center lg:p-8">
+    <div className="relative min-h-dvh w-full bg-[#0E1013] font-sans text-white antialiased lg:flex lg:items-center lg:justify-center lg:p-8">
       {/* Scoped styles: scrollbars, sliders, splash loader, interaction FX */}
       <style>{`
         .no-scrollbar::-webkit-scrollbar { display: none; }
         .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
-        .vslider { -webkit-appearance: none; appearance: none; width: 100%; height: 6px; border-radius: 9999px; background: rgba(28,25,23,0.1); outline: none; }
-        .vslider::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; width: 18px; height: 18px; border-radius: 9999px; cursor: pointer; box-shadow: 0 2px 6px rgba(28,25,23,0.25); }
-        .vslider::-moz-range-thumb { width: 18px; height: 18px; border: none; border-radius: 9999px; cursor: pointer; }
-        .vslider-emerald::-webkit-slider-thumb { background: #10b981; }
-        .vslider-emerald::-moz-range-thumb { background: #10b981; }
-        .vslider-amber::-webkit-slider-thumb { background: #f59e0b; }
-        .vslider-amber::-moz-range-thumb { background: #f59e0b; }
-        .vslider-sky::-webkit-slider-thumb { background: #0ea5e9; }
-        .vslider-sky::-moz-range-thumb { background: #0ea5e9; }
-        .press { transition: transform .15s ease; }
-        .press:active { transform: scale(0.92); }
-        .shine { background-size: 200% auto; animation: shine 4s linear infinite; }
-        .floaty { background-size: 200% 200%; animation: floaty 14s ease infinite; }
+        .vslider { -webkit-appearance: none; appearance: none; width: 100%; height: 6px; border-radius: 9999px; background: #3A3F46; outline: none; }
+        .vslider::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; width: 18px; height: 18px; border-radius: 9999px; cursor: pointer; background: #1FD173; }
+        .vslider::-moz-range-thumb { width: 18px; height: 18px; border: none; border-radius: 9999px; cursor: pointer; background: #1FD173; }
+        .press { transition: transform .12s ease; }
+        .press:active { transform: scale(0.97); }
         @keyframes loadbar { from { width: 0%; } to { width: 100%; } }
-        @keyframes fadeUp { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
-        @keyframes pop { 0% { transform: scale(.82); } 60% { transform: scale(1.08); } 100% { transform: scale(1); } }
-        @keyframes bob { 0%, 100% { transform: translate(-50%, 0); } 50% { transform: translate(-50%, -4px); } }
-        @keyframes glowPulse { 0%, 100% { box-shadow: 0 0 16px var(--glow); } 50% { box-shadow: 0 0 36px var(--glow); } }
-        @keyframes burstP { 0% { transform: translate(-50%, -50%) scale(1); opacity: 1; } 100% { transform: translate(calc(-50% + var(--dx)), calc(-50% + var(--dy))) scale(.2); opacity: 0; } }
-        @keyframes shine { to { background-position: 200% center; } }
-        @keyframes floaty { 0%, 100% { background-position: 0% 50%; } 50% { background-position: 100% 50%; } }
-        @keyframes toastIn { 0% { opacity: 0; transform: translate(-50%, 16px) scale(.9); } 12% { opacity: 1; transform: translate(-50%, 0) scale(1); } 88% { opacity: 1; transform: translate(-50%, 0) scale(1); } 100% { opacity: 0; transform: translate(-50%, -8px) scale(.98); } }
+        @keyframes fadeUp { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+        @keyframes pop { 0% { transform: scale(.9); } 100% { transform: scale(1); } }
+        @keyframes toastIn { 0% { opacity: 0; transform: translate(-50%, 12px); } 12% { opacity: 1; transform: translate(-50%, 0); } 88% { opacity: 1; transform: translate(-50%, 0); } 100% { opacity: 0; transform: translate(-50%, -8px); } }
       `}</style>
-
-      {/* Desktop-only ambient backdrop behind the phone frame */}
-      <div className="pointer-events-none absolute inset-0 hidden lg:block bg-[radial-gradient(ellipse_at_top_left,#FFFFFF_0%,transparent_55%),radial-gradient(ellipse_at_bottom_right,#D7F0E4_0%,transparent_55%),radial-gradient(ellipse_at_top_right,#FBE3D6_0%,transparent_50%)]" />
 
       {/* ─────────────── PHONE FRAME ───────────────
           Mobile: fills the native viewport edge-to-edge.
-          Desktop: centered, cropped device mock-up with rounded bezel. */}
-      <div className="relative h-dvh w-full overflow-hidden bg-gradient-to-b from-[#FAF8F4] to-[#F1EDE5] lg:h-[844px] lg:max-h-[94vh] lg:w-[390px] lg:rounded-[48px] lg:border lg:border-stone-700/60 lg:ring-[10px] lg:ring-stone-900 lg:shadow-[0_50px_140px_-20px_rgba(28,25,23,0.55)]">
-
-        {/* Soft animated mesh wash on the screen itself — keeps it from feeling flat */}
-        <div className="floaty pointer-events-none absolute inset-0 opacity-70 bg-[radial-gradient(circle_at_15%_10%,rgba(16,185,129,0.10),transparent_45%),radial-gradient(circle_at_85%_15%,rgba(244,63,94,0.08),transparent_45%),radial-gradient(circle_at_50%_100%,rgba(14,165,233,0.08),transparent_50%)]" />
+          Desktop: centered device mock-up with a plain bezel. */}
+      <div className="relative h-dvh w-full overflow-hidden bg-[#121417] lg:h-[844px] lg:max-h-[94vh] lg:w-[390px] lg:rounded-[48px] lg:ring-[10px] lg:ring-stone-900 lg:shadow-[0_30px_70px_-25px_rgba(0,0,0,0.45)]">
 
         {/* Notch — desktop mock-up only */}
-        <div className="absolute left-1/2 top-3.5 z-40 hidden h-7 w-32 -translate-x-1/2 rounded-full bg-stone-900 lg:block" />
+        <div className="absolute left-1/2 top-3.5 z-40 hidden h-7 w-32 -translate-x-1/2 rounded-full bg-black lg:block" />
 
         {/* ─────────────── SPLASH / LOADING SCREEN ─────────────── */}
         {!splashGone && (
-          <div className={`absolute inset-0 z-50 flex flex-col items-center justify-center bg-[#FAF8F4] transition-opacity duration-700 ${splashFading ? "opacity-0" : "opacity-100"}`}>
-            <div className="flex h-20 w-20 items-center justify-center rounded-3xl bg-gradient-to-br from-stone-900 to-stone-700 shadow-xl shadow-stone-900/25" style={{ animation: "pop .5s ease" }}>
-              <Scale className="h-9 w-9 text-[#FAF8F4]" />
+          <div className={`absolute inset-0 z-50 flex flex-col items-center justify-center bg-[#121417] transition-opacity duration-500 ${splashFading ? "opacity-0" : "opacity-100"}`}>
+            <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-[#1FD173]">
+              <Scale className="h-8 w-8 text-white" />
             </div>
-            <h1 className="mt-6 text-4xl font-black tracking-tight text-stone-900">
-              Vices<span className="shine bg-gradient-to-r from-emerald-500 via-teal-400 to-emerald-500 bg-clip-text text-transparent">.ai</span>
+            <h1 className="mt-5 text-3xl font-bold tracking-tight text-white">
+              Vices<span className="text-[#3BE08C]">.ai</span>
             </h1>
-            <p className="mt-2 text-sm text-stone-500">Earn your vices the easy way.</p>
-            <div className="mt-8 h-1 w-40 overflow-hidden rounded-full bg-stone-900/10">
-              <div className="h-full rounded-full bg-gradient-to-r from-emerald-500 to-teal-400" style={{ animation: "loadbar 2.2s ease-out forwards" }} />
+            <p className="mt-2 text-sm text-[#8B9099]">Earn your vices.</p>
+            <div className="mt-7 h-1 w-36 overflow-hidden rounded-full bg-[#2A2F36]">
+              <div className="h-full rounded-full bg-[#1FD173]" style={{ animation: "loadbar 2.2s ease-out forwards" }} />
             </div>
           </div>
         )}
@@ -1050,31 +1051,31 @@ export default function VicesAiPage() {
         {splashGone && onboardStep >= 0 && onboardStep < ONBOARD.length && (
           <div className="absolute inset-0 z-50 flex items-center justify-center p-6">
             {/* Tap the backdrop to dismiss */}
-            <div className="absolute inset-0 bg-stone-900/40 backdrop-blur-sm" onClick={dismissOnboard} />
+            <div className="absolute inset-0 bg-black/65" onClick={dismissOnboard} />
             <div
               key={onboardStep}
-              className="relative w-full max-w-[300px] rounded-3xl border border-stone-900/10 bg-[#FAF8F4] p-6 shadow-2xl"
+              className="relative w-full max-w-[300px] rounded-3xl border border-white/10 bg-[#FAF8F4] p-6 shadow-2xl"
               style={{ animation: "fadeUp .3s ease" }}
             >
               <button
                 onClick={dismissOnboard}
-                className="absolute right-4 top-4 text-[10px] font-bold uppercase tracking-[0.16em] text-stone-400 transition-colors hover:text-stone-700"
+                className="absolute right-4 top-4 text-[10px] font-bold uppercase tracking-[0.16em] text-[#7B818A] transition-colors hover:text-[#C7CCD3]"
               >
                 Skip
               </button>
-              <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-stone-900 text-[#FAF8F4] shadow-md shadow-stone-900/20">
+              <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-[#1FD173] text-white">
                 {ONBOARD[onboardStep].icon}
               </div>
-              <h3 className="mt-4 text-lg font-black leading-tight text-stone-900">{ONBOARD[onboardStep].title}</h3>
-              <p className="mt-1.5 text-[13px] leading-relaxed text-stone-500">{ONBOARD[onboardStep].body}</p>
+              <h3 className="mt-4 text-lg font-black leading-tight text-white">{ONBOARD[onboardStep].title}</h3>
+              <p className="mt-1.5 text-[13px] leading-relaxed text-[#8B9099]">{ONBOARD[onboardStep].body}</p>
               <div className="mt-5 flex items-center gap-1.5">
                 {ONBOARD.map((_, i) => (
-                  <span key={i} className={`h-1.5 rounded-full transition-all ${i === onboardStep ? "w-5 bg-stone-900" : "w-1.5 bg-stone-900/20"}`} />
+                  <span key={i} className={`h-1.5 rounded-full transition-all ${i === onboardStep ? "w-5 bg-[#1FD173]" : "w-1.5 bg-white/15"}`} />
                 ))}
               </div>
               <button
                 onClick={() => (onboardStep === ONBOARD.length - 1 ? dismissOnboard() : setOnboardStep((s) => s + 1))}
-                className="press mt-5 w-full rounded-xl bg-stone-900 py-3 text-[13px] font-bold text-white transition-colors hover:bg-stone-700"
+                className="press mt-5 w-full rounded-xl bg-[#1FD173] py-3 text-[13px] font-semibold text-white transition-colors hover:bg-[#16B863]"
               >
                 {onboardStep === ONBOARD.length - 1 ? "Let's go" : "Next"}
               </button>
@@ -1088,30 +1089,30 @@ export default function VicesAiPage() {
           {/* ── HEADER: brand + live balance pill ── */}
           <header className="flex flex-shrink-0 items-start justify-between">
             <div className="flex items-center gap-2.5">
-              <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-stone-900 shadow-md shadow-stone-900/20">
-                <Scale className="h-4 w-4 text-[#FAF8F4]" />
+              <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#1FD173]">
+                <Scale className="h-4 w-4 text-white" />
               </div>
-              <h1 className="text-lg font-bold leading-none tracking-tight text-stone-900">
-                Vices<span className="text-emerald-500">.ai</span>
+              <h1 className="text-lg font-black leading-none tracking-tight text-white">
+                Vices<span className="text-[#3BE08C]">.ai</span>
               </h1>
             </div>
             <div className="flex items-center gap-2">
               {streak > 0 && (
-                <div className="flex items-center gap-1 rounded-full border border-orange-500/20 bg-orange-500/10 px-2 py-1" title={`${streak}-day streak`}>
-                  <Flame className="h-3.5 w-3.5 text-orange-500" />
-                  <span className="text-[12px] font-black tabular-nums text-orange-600">{streak}</span>
+                <div className="flex items-center gap-1 rounded-full border border-gold/40 bg-gold/10 px-2 py-1" title={`${streak}-day streak`}>
+                  <Flame className="h-3.5 w-3.5 text-[#E6B65A]" />
+                  <span className="text-[12px] font-bold tabular-nums text-[#E6B65A]">{streak}</span>
                 </div>
               )}
               <div className="flex flex-col items-end gap-1">
-                <span className="text-[8px] font-semibold uppercase tracking-[0.2em] text-stone-400">Life Balance</span>
-                <div className="flex items-center gap-1.5 rounded-full border border-stone-900/10 bg-white/70 px-2.5 py-1">
+                <span className="text-[8px] font-semibold uppercase tracking-[0.2em] text-[#7B818A]">Life Balance</span>
+                <div className="flex items-center gap-1.5 rounded-full border border-white/10 bg-[#1C1F24] px-2.5 py-1">
                   <span className={`h-1.5 w-1.5 animate-pulse rounded-full ${status.dot} ${status.glow}`} />
                   <span className={`text-[10px] font-semibold ${status.text}`}>{status.label}</span>
                   <span className={`text-[11px] font-black tabular-nums ${status.text}`}>
                     {netME >= 0 ? "+" : ""}{fmt(netME)} pts
                   </span>
                 </div>
-                <span className="text-[7px] font-semibold uppercase tracking-[0.2em] text-stone-400/80">resets every monday</span>
+                <span className="text-[7px] font-semibold uppercase tracking-[0.2em] text-[#6E747C]/80">resets every monday</span>
               </div>
             </div>
           </header>
@@ -1124,20 +1125,34 @@ export default function VicesAiPage() {
                 {/* ── HOME DASHBOARD: rings, goal, and reward recommendations ── */}
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-[11px] font-semibold text-stone-400">{greeting()}</p>
-                    <h2 className="text-lg font-black leading-tight text-stone-900">Here&apos;s your balance</h2>
+                    <p className="text-[11px] font-semibold text-[#7B818A]">{greeting()}</p>
+                    <h2 className="text-lg font-black leading-tight text-white">Here&apos;s your balance</h2>
                   </div>
                   <div className="flex items-center gap-2">
                     <button
+                      onClick={() => setWrappedOpen(true)}
+                      className="press flex h-9 w-9 items-center justify-center rounded-full border border-[#2A2F36] bg-[#1C1F24] text-[#AEB4BC] transition-colors hover:bg-[#23272E]"
+                      aria-label="Weekly Wrapped"
+                    >
+                      <Share2 className="h-4 w-4" />
+                    </button>
+                    <button
                       onClick={() => setHistoryOpen(true)}
-                      className="press flex h-9 w-9 items-center justify-center rounded-full border border-stone-900/10 bg-white/70 text-stone-500 shadow-sm transition-colors hover:text-stone-900"
+                      className="press flex h-9 w-9 items-center justify-center rounded-full border border-white/10 bg-[#1C1F24] text-[#8B9099] shadow-sm transition-colors hover:text-white"
                       aria-label="History"
                     >
                       <History className="h-4 w-4" />
                     </button>
                     <button
+                      onClick={() => { setConfirmReset(null); setSettingsOpen(true); }}
+                      className="press flex h-9 w-9 items-center justify-center rounded-full border border-white/10 bg-[#1C1F24] text-[#8B9099] shadow-sm transition-colors hover:text-white"
+                      aria-label="Settings"
+                    >
+                      <Settings className="h-4 w-4" />
+                    </button>
+                    <button
                       onClick={() => setMode("allowance")}
-                      className="press flex items-center gap-1 rounded-full bg-stone-900 px-3.5 py-2 text-[11px] font-bold text-white shadow-md shadow-stone-900/20"
+                      className="press flex items-center gap-1 rounded-full bg-[#1FD173] px-3.5 py-2 text-[11px] font-semibold text-white hover:bg-[#16B863]"
                     >
                       <Zap className="h-3.5 w-3.5" /> Log
                     </button>
@@ -1148,7 +1163,7 @@ export default function VicesAiPage() {
                 {onTab && (
                   <button
                     onClick={() => setMode("allowance")}
-                    className={`press relative flex w-full items-center gap-3 overflow-hidden rounded-2xl bg-gradient-to-r p-4 text-left text-white shadow-lg ${tabOverdue ? "from-rose-600 to-red-600 shadow-rose-600/30" : "from-amber-500 to-rose-500 shadow-amber-500/25"}`}
+                    className={`press relative flex w-full items-center gap-3 overflow-hidden rounded-2xl bg-[#F0524B] p-4 text-left text-white`}
                     style={{ animation: "fadeUp .3s ease" }}
                   >
                     <span className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl bg-white/20">
@@ -1168,42 +1183,42 @@ export default function VicesAiPage() {
                 )}
 
                 {/* Apple-Fitness style dual ring */}
-                <div className="rounded-3xl border border-stone-900/10 bg-white/70 p-5 shadow-sm">
+                <div className="rounded-3xl border border-white/10 bg-[#1C1F24] p-5 shadow-sm">
                   <div className="flex items-center gap-5">
                     <div className="relative h-[132px] w-[132px] flex-shrink-0">
                       <svg viewBox="0 0 132 132" className="h-full w-full -rotate-90">
-                        <circle cx="66" cy="66" r="58" fill="none" stroke="rgba(16,185,129,0.12)" strokeWidth="11" />
-                        <circle cx="66" cy="66" r="44" fill="none" stroke="rgba(244,63,94,0.12)" strokeWidth="11" />
+                        <circle cx="66" cy="66" r="58" fill="none" stroke="rgba(31,209,115,0.22)" strokeWidth="11" />
+                        <circle cx="66" cy="66" r="44" fill="none" stroke="rgba(59,130,246,0.20)" strokeWidth="11" />
                         <circle
-                          cx="66" cy="66" r="58" fill="none" stroke="#10b981" strokeWidth="11" strokeLinecap="round"
+                          cx="66" cy="66" r="58" fill="none" stroke="#1FD173" strokeWidth="11" strokeLinecap="round"
                           strokeDasharray={2 * Math.PI * 58} strokeDashoffset={2 * Math.PI * 58 * (1 - goalProgress)}
                           style={{ transition: "stroke-dashoffset .6s ease" }}
                         />
                         <circle
-                          cx="66" cy="66" r="44" fill="none" stroke="#f43f5e" strokeWidth="11" strokeLinecap="round"
+                          cx="66" cy="66" r="44" fill="none" stroke="#3B82F6" strokeWidth="11" strokeLinecap="round"
                           strokeDasharray={2 * Math.PI * 44} strokeDashoffset={2 * Math.PI * 44 * (1 - burnProgress)}
                           style={{ transition: "stroke-dashoffset .6s ease" }}
                         />
                       </svg>
                       <div className="absolute inset-0 flex flex-col items-center justify-center">
-                        <span key={wallet} className="text-3xl font-black leading-none tabular-nums text-stone-900" style={{ animation: "pop .25s ease" }}>{fmt(wallet)}</span>
-                        <span className="text-[8px] font-bold uppercase tracking-[0.16em] text-stone-400">to spend</span>
+                        <span key={wallet} className="text-3xl font-black leading-none tabular-nums text-white" style={{ animation: "pop .25s ease" }}>{fmt(wallet)}</span>
+                        <span className="text-[8px] font-bold uppercase tracking-[0.16em] text-[#7B818A]">to spend</span>
                       </div>
                     </div>
                     <div className="flex-1 space-y-3">
                       <div>
                         <div className="flex items-center gap-1.5">
-                          <span className="h-2 w-2 rounded-full bg-emerald-500" />
-                          <span className="text-[10px] font-bold uppercase tracking-wider text-stone-400">Earned</span>
+                          <span className="h-2 w-2 rounded-full bg-[#1FD173]" />
+                          <span className="text-[10px] font-bold uppercase tracking-wider text-[#7B818A]">Earned</span>
                         </div>
-                        <p className="text-xl font-black tabular-nums text-stone-900">{fmt(earnedME)} <span className="text-xs font-semibold text-stone-400">/ {WEEKLY_GOAL}</span></p>
+                        <p className="text-xl font-black tabular-nums text-[#3BE08C]">{fmt(earnedME)} <span className="text-xs font-semibold text-[#7B818A]">/ {WEEKLY_GOAL}</span></p>
                       </div>
                       <div>
                         <div className="flex items-center gap-1.5">
-                          <span className="h-2 w-2 rounded-full bg-rose-500" />
-                          <span className="text-[10px] font-bold uppercase tracking-wider text-stone-400">Spent</span>
+                          <span className="h-2 w-2 rounded-full bg-[#3B82F6]" />
+                          <span className="text-[10px] font-bold uppercase tracking-wider text-[#7B818A]">Spent</span>
                         </div>
-                        <p className="text-xl font-black tabular-nums text-stone-900">{fmt(spentME)} <span className="text-xs font-semibold text-stone-400">pts</span></p>
+                        <p className="text-xl font-black tabular-nums text-[#6BA5FF]">{fmt(spentME)} <span className="text-xs font-semibold text-[#7B818A]">pts</span></p>
                       </div>
                     </div>
                   </div>
@@ -1212,62 +1227,38 @@ export default function VicesAiPage() {
                 {/* The coach — a foul-mouthed read on how you're playing. Tap to reroll. */}
                 <button
                   onClick={() => setCoachIdx((i) => i + 1)}
-                  className="press flex items-center gap-3 rounded-2xl border border-stone-900/10 bg-white/60 px-4 py-3 text-left"
+                  className="press flex items-center gap-3 rounded-2xl border border-white/10 bg-[#1C1F24] px-4 py-3 text-left"
                   aria-label="Coach says — tap for another"
                 >
                   <span className={`flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-xl ${COACH_TINT[coachMood]}`}>
                     <MessageCircle className="h-4 w-4" />
                   </span>
-                  <p key={`${coachMood}-${coachIdx}`} className="flex-1 text-[12.5px] font-semibold leading-snug text-stone-700" style={{ animation: "fadeUp .3s ease" }}>
+                  <p key={`${coachMood}-${coachIdx}`} className="flex-1 text-[12.5px] font-semibold leading-snug text-[#C7CCD3]" style={{ animation: "fadeUp .3s ease" }}>
                     {coachLine}
                   </p>
                 </button>
 
                 {/* Weekly goal bar (Duolingo progression) */}
-                <div className="rounded-2xl border border-stone-900/10 bg-white/40 p-4">
+                <div className="rounded-2xl border border-white/10 bg-[#23272E] p-4">
                   <div className="mb-2 flex items-center justify-between">
-                    <span className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-[0.16em] text-stone-500"><TrendingUp className="h-3.5 w-3.5" /> Weekly goal</span>
-                    <span className="text-[11px] font-bold tabular-nums text-stone-500">{fmt(earnedME)} / {WEEKLY_GOAL}</span>
+                    <span className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-[0.16em] text-[#8B9099]"><TrendingUp className="h-3.5 w-3.5" /> Weekly goal</span>
+                    <span className="text-[11px] font-bold tabular-nums text-[#8B9099]">{fmt(earnedME)} / {WEEKLY_GOAL}</span>
                   </div>
-                  <div className="h-2.5 overflow-hidden rounded-full bg-stone-900/10">
-                    <div className="h-full rounded-full bg-gradient-to-r from-emerald-500 to-teal-400" style={{ width: `${goalProgress * 100}%`, transition: "width .6s ease" }} />
+                  <div className="h-2.5 overflow-hidden rounded-full bg-white/10">
+                    <div className="h-full rounded-full bg-[#1FD173]" style={{ width: `${goalProgress * 100}%`, transition: "width .6s ease" }} />
                   </div>
-                  <p className="mt-2 text-[10px] text-stone-400">
+                  <p className="mt-2 text-[10px] text-[#7B818A]">
                     {goalProgress >= 1 ? "Goal smashed — you've earned the weekend." : `${fmt(WEEKLY_GOAL - earnedME)} pts to hit this week's goal.`}
                   </p>
                 </div>
 
-                {/* For You — recommendation cards (Spotify + Uber Eats) */}
-                <div>
-                  <span className="mb-2 flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-[0.16em] text-stone-500"><Sparkles className="h-3.5 w-3.5" /> For you</span>
-                  <div data-noswipe className="no-scrollbar -mx-1 flex gap-3 overflow-x-auto px-1 pb-1">
-                    {recs.map((r, i) => (
-                      <button
-                        key={r.key}
-                        onClick={r.onTap}
-                        style={{ animation: `fadeUp .3s ease ${i * 60}ms both` }}
-                        className={`press relative flex h-[126px] w-[152px] flex-shrink-0 flex-col justify-between overflow-hidden rounded-2xl bg-gradient-to-br ${r.grad} p-3.5 text-left text-white shadow-lg`}
-                      >
-                        <div className="flex items-center justify-between">
-                          <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-white/20">{r.icon}</span>
-                          <span className="text-[8px] font-bold uppercase tracking-wider text-white/80">{r.tag}</span>
-                        </div>
-                        <div>
-                          <p className="text-sm font-black leading-tight">{r.title}</p>
-                          <p className="text-[10px] text-white/80">{r.sub}</p>
-                        </div>
-                        <span className="flex items-center gap-0.5 text-[10px] font-bold">{r.cta}<ChevronRight className="h-3 w-3" /></span>
-                      </button>
-                    ))}
-                  </div>
-                </div>
 
                 {/* Last move */}
-                <div className="mt-auto flex items-center gap-3 rounded-2xl border border-stone-900/10 bg-white/40 px-4 py-3">
-                  <span className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-xl bg-stone-900/5 text-stone-500"><Activity className="h-4 w-4" /></span>
+                <div className="mt-auto flex items-center gap-3 rounded-2xl border border-white/10 bg-[#23272E] px-4 py-3">
+                  <span className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-xl bg-white/5 text-[#8B9099]"><Activity className="h-4 w-4" /></span>
                   <div className="min-w-0 flex-1">
-                    <p className="text-[9px] font-bold uppercase tracking-[0.16em] text-stone-400">Last move</p>
-                    <p className="truncate text-[12px] font-semibold text-stone-700">{lastEntry ?? "Nothing yet — log your first habit."}</p>
+                    <p className="text-[9px] font-bold uppercase tracking-[0.16em] text-[#7B818A]">Last move</p>
+                    <p className="truncate text-[12px] font-semibold text-[#C7CCD3]">{lastEntry ?? "Nothing yet — log your first habit."}</p>
                   </div>
                 </div>
               </>
@@ -1276,7 +1267,7 @@ export default function VicesAiPage() {
                 {/* Leaderboard: one squad, four ways to judge it */}
                 <div>
                   <h2 className={`text-xs font-bold uppercase tracking-[0.18em] ${accent.text}`}>Leaderboard</h2>
-                  <p className="mt-1 text-[11px] italic text-stone-400">Your circle, ranked. Pick the lens.</p>
+                  <p className="mt-1 text-[11px] italic text-[#7B818A]">Your circle, ranked. Pick the lens.</p>
                 </div>
                 <div className="flex gap-2">
                   <input
@@ -1284,11 +1275,11 @@ export default function VicesAiPage() {
                     onChange={(e) => setNewFriend(e.target.value)}
                     onKeyDown={(e) => e.key === "Enter" && addFriend()}
                     placeholder="Add a friend by name"
-                    className="min-w-0 flex-1 rounded-xl border border-stone-900/15 bg-white/70 px-3.5 py-2.5 text-sm text-stone-800 placeholder:text-stone-400 focus:border-stone-900/30 focus:outline-none"
+                    className="min-w-0 flex-1 rounded-xl border border-white/12 bg-[#1C1F24] px-3.5 py-2.5 text-sm text-white placeholder:text-[#7B818A] focus:border-white/20 focus:outline-none"
                   />
                   <button
                     onClick={addFriend}
-                    className="press flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl bg-stone-900 text-[#FAF8F4] transition-colors hover:bg-stone-700"
+                    className="press flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl bg-[#1FD173] text-white transition-colors hover:bg-[#16B863]"
                     aria-label="Add friend"
                   >
                     <UserPlus className="h-4 w-4" />
@@ -1303,7 +1294,7 @@ export default function VicesAiPage() {
                       <button
                         key={m.id}
                         onClick={() => setMetric(m.id)}
-                        className={`press flex flex-col items-center gap-1 rounded-xl border py-2 transition-colors ${on ? m.chipOn : "border-stone-900/10 bg-white/40 text-stone-400 hover:text-stone-600"}`}
+                        className={`press flex flex-col items-center gap-1 rounded-xl border py-2 transition-colors ${on ? m.chipOn : "border-white/10 bg-[#23272E] text-[#7B818A] hover:text-[#AEB4BC]"}`}
                         style={on ? { animation: "pop .3s ease" } : undefined}
                       >
                         {m.icon}
@@ -1315,7 +1306,7 @@ export default function VicesAiPage() {
 
                 {/* Re-keyed by metric so every switch replays the entrances */}
                 <div key={metric} className="flex flex-col gap-2">
-                  <p className="text-[10px] italic leading-relaxed text-stone-400" style={{ animation: "fadeUp .3s ease" }}>
+                  <p className="text-[10px] italic leading-relaxed text-[#7B818A]" style={{ animation: "fadeUp .3s ease" }}>
                     {activeMetric.tagline}
                   </p>
 
@@ -1328,20 +1319,17 @@ export default function VicesAiPage() {
                       return (
                         <div
                           key={f.name}
-                          className={`relative flex flex-col items-center gap-0.5 rounded-2xl border px-1.5 text-center ${first ? "border-stone-900/15 bg-white pb-3.5 pt-5 shadow-xl" : "border-stone-900/10 bg-white/60 py-3"} ${f.you ? "ring-2 ring-stone-900/25" : ""}`}
+                          className={`relative flex flex-col items-center gap-0.5 rounded-2xl border px-1.5 text-center ${first ? "border-white/12 bg-[#1C1F24] pb-3.5 pt-5 shadow-xl" : "border-white/10 bg-[#1C1F24] py-3"} ${f.you ? "ring-2 ring-[#1FD173]/60" : ""}`}
                           style={
                             first
-                              ? ({ "--glow": activeMetric.glow, animation: "fadeUp .45s ease both, glowPulse 2.4s ease-in-out .45s infinite" } as React.CSSProperties)
+                              ? ({ animation: "fadeUp .45s ease both" } as React.CSSProperties)
                               : { animation: `fadeUp .4s ease ${ci * 80}ms both` }
                           }
                         >
-                          {first && (
-                            <Crown className="absolute -top-3 left-1/2 h-5 w-5 text-amber-500" style={{ animation: "bob 1.6s ease-in-out infinite" }} />
-                          )}
-                          <span className="flex h-5 w-5 items-center justify-center rounded-full bg-stone-900 text-[9px] font-black text-white">{rank}</span>
-                          <p className="w-full truncate text-[11px] font-bold text-stone-900">{f.name}</p>
+                          <span className="flex h-5 w-5 items-center justify-center rounded-full bg-[#1FD173] text-[9px] font-bold text-white">{rank}</span>
+                          <p className="w-full truncate text-[11px] font-bold text-white">{f.name}</p>
                           <p className={`text-lg font-black leading-none tabular-nums ${activeMetric.text}`}>{fmt(activeMetric.score(f))}</p>
-                          <p className="text-[7px] uppercase tracking-wider text-stone-400">{activeMetric.unit}</p>
+                          <p className="text-[7px] uppercase tracking-wider text-[#7B818A]">{activeMetric.unit}</p>
                         </div>
                       );
                     })}
@@ -1351,17 +1339,17 @@ export default function VicesAiPage() {
                   {restRows.map((f, i) => (
                     <div
                       key={f.name}
-                      className={`flex items-center gap-3 rounded-xl border px-3.5 py-2.5 ${f.you ? "border-stone-900/30 bg-white shadow-sm" : "border-stone-900/10 bg-white/50"}`}
+                      className={`flex items-center gap-3 rounded-xl border px-3.5 py-2.5 ${f.you ? "border-white/20 bg-[#1C1F24] shadow-sm" : "border-white/10 bg-[#1C1F24]"}`}
                       style={{ animation: `fadeUp .35s ease ${200 + i * 70}ms both` }}
                     >
-                      <span className="w-4 flex-shrink-0 text-xs font-bold tabular-nums text-stone-400">{i + 4}</span>
+                      <span className="w-4 flex-shrink-0 text-xs font-bold tabular-nums text-[#7B818A]">{i + 4}</span>
                       <div className="min-w-0 flex-1">
-                        <p className="text-[13px] font-semibold text-stone-900">{f.name}</p>
-                        <p className="truncate text-[10px] text-stone-400">{f.last}</p>
+                        <p className="text-[13px] font-semibold text-white">{f.name}</p>
+                        <p className="truncate text-[10px] text-[#7B818A]">{f.last}</p>
                       </div>
                       <div className="flex-shrink-0 text-right">
                         <p className={`text-base font-bold leading-none tabular-nums ${activeMetric.text}`}>{fmt(activeMetric.score(f))}</p>
-                        <p className="mt-0.5 text-[8px] uppercase tracking-wider text-stone-400">{activeMetric.unit}</p>
+                        <p className="mt-0.5 text-[8px] uppercase tracking-wider text-[#7B818A]">{activeMetric.unit}</p>
                       </div>
                       <span className={`h-1.5 w-1.5 flex-shrink-0 rounded-full ${dotFor(f.net)}`} />
                     </div>
@@ -1374,7 +1362,7 @@ export default function VicesAiPage() {
                 <h2 className={`text-xs font-bold uppercase tracking-[0.18em] ${accent.text}`}>Vices Store</h2>
 
                 {/* Wallet banner — spendable balance, or the live tab when you owe */}
-                <div className={`relative flex flex-shrink-0 items-center gap-3 overflow-hidden rounded-2xl bg-gradient-to-br px-4 py-3.5 text-white shadow-lg ${onTab ? (tabOverdue ? "from-rose-600 to-red-600 shadow-rose-600/30" : "from-amber-500 to-rose-500 shadow-amber-500/25") : "from-rose-500 to-amber-500 shadow-rose-500/25"}`}>
+                <div className={`relative flex flex-shrink-0 items-center gap-3 overflow-hidden rounded-2xl px-4 py-3.5 text-white ${onTab ? "bg-[#F0524B]" : "bg-[#1FD173]"}`}>
                   {burst && (
                     <div className="pointer-events-none absolute inset-0 z-10">
                       {burst.parts.map((p) => (
@@ -1396,11 +1384,13 @@ export default function VicesAiPage() {
 
                 {/* Catalogue — tap an affordable item to buy it, locked ones show the gap */}
                 <div className="flex flex-col gap-3">
-                  {VICE_CATEGORIES.map((cat) => (
+                  {VICE_CATEGORIES.map((cat) => {
+                    const th = STORE_THEME[cat.id];
+                    return (
                     <div key={cat.id}>
-                      <div className="mb-1.5 flex items-center gap-1.5 text-stone-500">
-                        <span className={accent.text}>{cat.icon}</span>
-                        <span className="text-[10px] font-bold uppercase tracking-[0.18em]">{cat.label}</span>
+                      <div className={`mb-1.5 flex items-center gap-1.5 ${th.label}`}>
+                        {cat.icon}
+                        <span className="text-[10px] font-black uppercase tracking-[0.18em]">{cat.label}</span>
                       </div>
                       <div className="grid grid-cols-2 gap-2">
                         {cat.vices.map((v, vi) => {
@@ -1408,16 +1398,16 @@ export default function VicesAiPage() {
                           return (
                             <button
                               key={v.id}
-                              onClick={() => buyVice(v)}
+                              onClick={() => requestBuy(v)}
                               style={{ animation: `fadeUp .25s ease ${vi * 30}ms both` }}
-                              className={`press relative flex items-center gap-2.5 rounded-xl border px-3 py-2.5 text-left transition-all ${afford ? "border-stone-900/10 bg-white/70 hover:bg-white hover:shadow-md" : "border-amber-500/30 bg-amber-500/5 hover:bg-amber-500/10"}`}
+                              className={`press relative flex items-center gap-2.5 rounded-xl border px-3 py-2.5 text-left transition-all ${afford ? `${th.face} ${th.shadow} hover:shadow-md` : "border-white/10 bg-[#23272E] hover:bg-[#22262C]"}`}
                             >
-                              <span className={`flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg ${afford ? "bg-rose-500/10 text-rose-600" : "bg-amber-500/15 text-amber-600"}`}>
+                              <span className={`flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg shadow-sm ${afford ? `${th.tile} text-white` : "bg-white/5 text-[#7B818A]"}`}>
                                 {v.icon}
                               </span>
                               <span className="min-w-0 flex-1">
-                                <span className="block truncate text-[12px] font-semibold text-stone-800">{v.label}</span>
-                                <span className={`block text-[10px] font-bold tabular-nums ${afford ? "text-rose-600" : "text-amber-600"}`}>
+                                <span className={`block truncate text-[12px] font-semibold ${afford ? "text-white" : "text-[#7B818A]"}`}>{v.label}</span>
+                                <span className={`block text-[10px] font-bold tabular-nums ${afford ? th.label : "text-[#7B818A]"}`}>
                                   {afford ? `${fmt(v.me)} pts` : `${fmt(v.me)} pts · on tab`}
                                 </span>
                               </span>
@@ -1426,7 +1416,8 @@ export default function VicesAiPage() {
                         })}
                       </div>
                     </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </>
             ) : (
@@ -1437,26 +1428,26 @@ export default function VicesAiPage() {
                 {/* Activity selector — opens the habit bottom-sheet */}
                 <button
                   onClick={openHabitSheet}
-                  className="press flex w-full items-center gap-3 rounded-2xl border border-stone-900/10 bg-white/70 px-4 py-3.5 text-left shadow-sm transition-colors hover:bg-white"
+                  className="press flex w-full items-center gap-3 rounded-2xl border border-white/10 bg-[#1C1F24] px-4 py-3.5 text-left shadow-sm transition-colors hover:bg-[#22262C]"
                 >
-                  <span className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl bg-emerald-500/10 text-emerald-600">
+                  <span className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl bg-[#1FD173]/10 text-[#3BE08C]">
                     {item.icon}
                   </span>
                   <span className="min-w-0 flex-1">
-                    <span className="block text-[9px] font-semibold uppercase tracking-[0.18em] text-stone-400">Activity</span>
-                    <span className="block truncate text-sm font-bold text-stone-900">{item.label}</span>
+                    <span className="block text-[9px] font-semibold uppercase tracking-[0.18em] text-[#7B818A]">Activity</span>
+                    <span className="block truncate text-sm font-bold text-white">{item.label}</span>
                   </span>
-                  <span className="flex-shrink-0 text-[10px] tabular-nums text-stone-400">{fmt(item.me)} pts each</span>
-                  <ChevronDown className="h-4 w-4 flex-shrink-0 text-stone-400" />
+                  <span className="flex-shrink-0 text-[10px] tabular-nums text-[#7B818A]">{fmt(item.me)} pts each</span>
+                  <ChevronDown className="h-4 w-4 flex-shrink-0 text-[#7B818A]" />
                 </button>
 
                 {/* Quantity — hero number + slider */}
-                <div className="rounded-2xl border border-stone-900/10 bg-white/40 p-4">
+                <div className="rounded-2xl border border-white/10 bg-[#23272E] p-4">
                   <div className="flex items-end justify-between">
-                    <span className="text-[9px] font-semibold uppercase tracking-[0.18em] text-stone-400">How many</span>
+                    <span className="text-[9px] font-semibold uppercase tracking-[0.18em] text-[#7B818A]">How many</span>
                     <span className={`flex items-baseline gap-1.5 font-black tabular-nums ${accent.text}`}>
                       <span key={qty} className="text-3xl leading-none" style={{ animation: "pop .2s ease" }}>{fmt(qty)}</span>
-                      <span className="text-xs font-semibold text-stone-400">{qty === 1 ? item.unitOne : item.unit}</span>
+                      <span className="text-xs font-semibold text-[#7B818A]">{qty === 1 ? item.unitOne : item.unit}</span>
                     </span>
                   </div>
                   <input
@@ -1472,39 +1463,39 @@ export default function VicesAiPage() {
                 </div>
 
                 {/* What that effort buys */}
-                <div className="rounded-2xl border border-stone-900/10 bg-white/40 p-4">
-                  <p className="text-[9px] font-semibold uppercase tracking-[0.18em] text-stone-400">That effort buys — take your pick</p>
+                <div className="rounded-2xl border border-white/10 bg-[#23272E] p-4">
+                  <p className="text-[9px] font-semibold uppercase tracking-[0.18em] text-[#7B818A]">That effort buys — take your pick</p>
                   <div className="mt-3 grid grid-cols-3 gap-2">
                     {spendSingles.map(({ v, n }, i) => (
                       <div
                         key={v.id}
-                        className="flex flex-col items-center gap-1 rounded-xl border border-stone-900/10 bg-white/60 py-2.5"
+                        className="flex flex-col items-center gap-1 rounded-xl border border-white/10 bg-[#1C1F24] py-2.5"
                         style={{ animation: `fadeUp .25s ease ${i * 50}ms both` }}
                       >
                         <span className={accent.text}>{v.icon}</span>
-                        <span className="text-xl font-black leading-none tabular-nums text-stone-900">{n}</span>
-                        <span className="text-[8px] uppercase tracking-wider text-stone-400">{n === 1 ? v.unitOne : v.unit}</span>
+                        <span className="text-xl font-black leading-none tabular-nums text-white">{n}</span>
+                        <span className="text-[8px] uppercase tracking-wider text-[#7B818A]">{n === 1 ? v.unitOne : v.unit}</span>
                       </div>
                     ))}
                   </div>
-                  <p className="mt-3 border-t border-stone-900/5 pt-2.5 text-[11px] text-stone-500">
+                  <p className="mt-3 border-t border-white/8 pt-2.5 text-[11px] text-[#8B9099]">
                     or mix it: <span className={`font-bold ${accent.text}`}>{comboLine}</span>
                   </p>
                 </div>
 
                 {/* This week — compact progress toward the weekly goal */}
-                <div className="mt-auto rounded-2xl border border-stone-900/10 bg-white/40 p-4">
+                <div className="mt-auto rounded-2xl border border-white/10 bg-[#23272E] p-4">
                   <div className="flex items-center justify-between">
-                    <span className="text-[9px] font-semibold uppercase tracking-[0.18em] text-stone-400">This week</span>
+                    <span className="text-[9px] font-semibold uppercase tracking-[0.18em] text-[#7B818A]">This week</span>
                     <span className="text-[10px] tabular-nums">
-                      <span className="font-bold text-emerald-600">+{fmt(earnedME)}</span> earned&nbsp;·&nbsp;
-                      <span className="font-bold text-amber-600">−{fmt(spentME)}</span> spent
+                      <span className="font-bold text-[#3BE08C]">+{fmt(earnedME)}</span> earned&nbsp;·&nbsp;
+                      <span className="font-bold text-[#6BA5FF]">−{fmt(spentME)}</span> spent
                     </span>
                   </div>
-                  <div className="mt-2.5 h-2 overflow-hidden rounded-full bg-stone-900/10">
-                    <div className="h-full rounded-full bg-gradient-to-r from-emerald-500 to-teal-400" style={{ width: `${goalProgress * 100}%`, transition: "width .6s ease" }} />
+                  <div className="mt-2.5 h-2 overflow-hidden rounded-full bg-white/10">
+                    <div className="h-full rounded-full bg-[#1FD173]" style={{ width: `${goalProgress * 100}%`, transition: "width .6s ease" }} />
                   </div>
-                  <p className="mt-1.5 text-[9px] text-stone-400">
+                  <p className="mt-1.5 text-[9px] text-[#7B818A]">
                     {goalProgress >= 1 ? "Weekly goal smashed — enjoy yourself." : `${fmt(WEEKLY_GOAL - earnedME)} pts to your weekly goal.`}
                   </p>
                 </div>
@@ -1535,12 +1526,12 @@ export default function VicesAiPage() {
           </main>
 
           {/* ── BOTTOM TAB BAR ── */}
-          <nav className="flex flex-shrink-0 rounded-2xl border border-stone-900/10 bg-stone-900/5 p-1">
+          <nav className="flex flex-shrink-0 rounded-2xl border border-[#2A2F36] bg-[#252A30] p-1">
             {TABS.map(({ id, label, icon }) => (
               <button
                 key={id}
                 onClick={() => setMode(id)}
-                className={`press flex flex-1 flex-col items-center gap-1 rounded-xl py-2 transition-colors ${mode === id ? "bg-white text-stone-900 shadow-sm" : "text-stone-400 hover:text-stone-600"}`}
+                className={`press flex flex-1 flex-col items-center gap-1 rounded-xl py-2 transition-colors ${mode === id ? "bg-[#1FD173] text-white" : "text-[#7B818A] hover:text-[#AEB4BC]"}`}
               >
                 <span style={mode === id ? { animation: "pop .3s ease" } : undefined}>{icon}</span>
                 <span className="text-[9px] font-semibold">{label}</span>
@@ -1553,13 +1544,13 @@ export default function VicesAiPage() {
         {toast && (
           <div
             key={toast.id}
-            className="pointer-events-none absolute bottom-24 left-1/2 z-40 flex -translate-x-1/2 items-center gap-2 rounded-full bg-stone-900 px-4 py-2 text-white shadow-xl shadow-stone-900/30"
+            className="pointer-events-none absolute bottom-24 left-1/2 z-40 flex -translate-x-1/2 items-center gap-2 rounded-full bg-[#252A30] border border-white/10 px-4 py-2 text-white"
             style={{ animation: "toastIn 1.8s ease forwards" }}
           >
-            <ShoppingBag className="h-3.5 w-3.5 text-rose-300" />
+            <ShoppingBag className="h-3.5 w-3.5 text-white" />
             <span className="text-[12px] font-semibold">{toast.text}</span>
             {toast.pts !== 0 && (
-              <span className="text-[12px] font-black tabular-nums text-rose-300">{toast.pts < 0 ? "−" : "+"}{fmt(Math.abs(toast.pts))} pts</span>
+              <span className="text-[12px] font-black tabular-nums text-white">{toast.pts < 0 ? "−" : "+"}{fmt(Math.abs(toast.pts))} pts</span>
             )}
           </div>
         )}
@@ -1567,45 +1558,45 @@ export default function VicesAiPage() {
         {/* ─────────────── CATEGORIZED HABIT PICKER (bottom sheet) ─────────────── */}
         {habitPickerOpen && (
           <div className="absolute inset-0 z-30">
-            <div className="absolute inset-0 bg-stone-900/30 backdrop-blur-sm" onClick={() => setHabitPickerOpen(false)} />
-            <div className="no-scrollbar absolute inset-x-0 bottom-0 max-h-[75%] overflow-y-auto rounded-t-3xl border-t border-stone-900/10 bg-[#FAF8F4]/95 p-5 backdrop-blur-xl" style={{ animation: "fadeUp .3s ease" }}>
-              <div className="mx-auto mb-4 h-1 w-10 rounded-full bg-stone-900/15" />
-              <h3 className="mb-3 text-xs font-bold uppercase tracking-[0.18em] text-stone-500">What did you do?</h3>
+            <div className="absolute inset-0 bg-black/60" onClick={() => setHabitPickerOpen(false)} />
+            <div className="no-scrollbar absolute inset-x-0 bottom-0 max-h-[75%] overflow-y-auto rounded-t-3xl border-t border-white/10 bg-[#121417] p-5" style={{ animation: "fadeUp .3s ease" }}>
+              <div className="mx-auto mb-4 h-1 w-10 rounded-full bg-white/12" />
+              <h3 className="mb-3 text-xs font-bold uppercase tracking-[0.18em] text-[#8B9099]">What did you do?</h3>
               <div className="space-y-2">
                 {HABIT_CATS.map((cat) => {
                   // Single-option categories (Water) select straight from the row.
                   const single = cat.options.length === 1;
                   const open = openHabitCat === cat.id;
                   return (
-                    <div key={cat.id} className="overflow-hidden rounded-xl border border-stone-900/10 bg-white/60">
+                    <div key={cat.id} className="overflow-hidden rounded-xl border border-white/10 bg-[#1C1F24]">
                       <button
                         onClick={() => (single ? selectHabit(cat.options[0]) : setOpenHabitCat(open ? "" : cat.id))}
-                        className="press flex w-full items-center gap-3 px-4 py-3 transition-colors hover:bg-stone-900/5"
+                        className="press flex w-full items-center gap-3 px-4 py-3 transition-colors hover:bg-[#22262C]/5"
                       >
-                        <span className="text-emerald-600">{cat.icon}</span>
-                        <span className="flex-1 text-left text-sm font-semibold text-stone-800">{cat.label}</span>
+                        <span className="text-[#3BE08C]">{cat.icon}</span>
+                        <span className="flex-1 text-left text-sm font-semibold text-white">{cat.label}</span>
                         {single ? (
                           <>
-                            <span className="text-[10px] text-stone-400">{fmt(cat.options[0].me)} pts</span>
-                            {habitId === cat.options[0].id && <Check className="h-3.5 w-3.5 text-emerald-600" />}
+                            <span className="text-[10px] text-[#7B818A]">{fmt(cat.options[0].me)} pts</span>
+                            {habitId === cat.options[0].id && <Check className="h-3.5 w-3.5 text-[#3BE08C]" />}
                           </>
                         ) : (
-                          <ChevronDown className={`h-4 w-4 text-stone-400 transition-transform duration-200 ${open ? "rotate-180" : ""}`} />
+                          <ChevronDown className={`h-4 w-4 text-[#7B818A] transition-transform duration-200 ${open ? "rotate-180" : ""}`} />
                         )}
                       </button>
                       {!single && open && (
-                        <div className="border-t border-stone-900/5">
+                        <div className="border-t border-white/8">
                           {cat.options.map((h, hi) => (
                             <button
                               key={h.id}
                               onClick={() => selectHabit(h)}
-                              className="press flex w-full items-center gap-3 px-4 py-2.5 transition-colors hover:bg-stone-900/5"
+                              className="press flex w-full items-center gap-3 px-4 py-2.5 transition-colors hover:bg-[#22262C]/5"
                               style={{ animation: `fadeUp .25s ease ${hi * 40}ms both` }}
                             >
-                              <span className="text-stone-400">{h.icon}</span>
-                              <span className="flex-1 text-left text-[13px] text-stone-700">{h.label}</span>
-                              <span className="text-[10px] text-stone-400">{fmt(h.me)} pts</span>
-                              {habitId === h.id && <Check className="h-3.5 w-3.5 text-emerald-600" />}
+                              <span className="text-[#7B818A]">{h.icon}</span>
+                              <span className="flex-1 text-left text-[13px] text-[#C7CCD3]">{h.label}</span>
+                              <span className="text-[10px] text-[#7B818A]">{fmt(h.me)} pts</span>
+                              {habitId === h.id && <Check className="h-3.5 w-3.5 text-[#3BE08C]" />}
                             </button>
                           ))}
                         </div>
@@ -1621,21 +1612,21 @@ export default function VicesAiPage() {
         {/* ─────────────── HISTORY SHEET (lifetime tallies) ─────────────── */}
         {historyOpen && (
           <div className="absolute inset-0 z-40">
-            <div className="absolute inset-0 bg-stone-900/30 backdrop-blur-sm" onClick={() => setHistoryOpen(false)} />
-            <div className="no-scrollbar absolute inset-x-0 bottom-0 max-h-[82%] overflow-y-auto rounded-t-3xl border-t border-stone-900/10 bg-[#FAF8F4]/95 p-5 backdrop-blur-xl" style={{ animation: "fadeUp .3s ease" }}>
-              <div className="mx-auto mb-4 h-1 w-10 rounded-full bg-stone-900/15" />
-              <h3 className="mb-3 text-xs font-bold uppercase tracking-[0.18em] text-stone-500">Your history · all time</h3>
+            <div className="absolute inset-0 bg-black/60" onClick={() => setHistoryOpen(false)} />
+            <div className="no-scrollbar absolute inset-x-0 bottom-0 max-h-[82%] overflow-y-auto rounded-t-3xl border-t border-white/10 bg-[#121417] p-5" style={{ animation: "fadeUp .3s ease" }}>
+              <div className="mx-auto mb-4 h-1 w-10 rounded-full bg-white/12" />
+              <h3 className="mb-3 text-xs font-bold uppercase tracking-[0.18em] text-[#8B9099]">Your history · all time</h3>
 
               {/* All-time totals */}
               <div className="grid grid-cols-3 gap-2">
                 {([
-                  { label: "Earned", value: lifeEarned, cls: "text-emerald-600" },
-                  { label: "Spent", value: lifeSpent, cls: "text-rose-600" },
-                  { label: "Net", value: round2(lifeEarned - lifeSpent), cls: "text-stone-900" },
+                  { label: "Earned", value: lifeEarned, cls: "text-[#3BE08C]" },
+                  { label: "Spent", value: lifeSpent, cls: "text-[#6BA5FF]" },
+                  { label: "Net", value: round2(lifeEarned - lifeSpent), cls: "text-white" },
                 ] as const).map((s) => (
-                  <div key={s.label} className="rounded-xl border border-stone-900/10 bg-white/70 px-3 py-2.5 text-center">
+                  <div key={s.label} className="rounded-xl border border-white/10 bg-[#1C1F24] px-3 py-2.5 text-center">
                     <p className={`text-lg font-black leading-none tabular-nums ${s.cls}`}>{fmt(s.value)}</p>
-                    <p className="mt-1 text-[8px] font-bold uppercase tracking-wider text-stone-400">{s.label} pts</p>
+                    <p className="mt-1 text-[8px] font-bold uppercase tracking-wider text-[#7B818A]">{s.label} pts</p>
                   </div>
                 ))}
               </div>
@@ -1643,20 +1634,20 @@ export default function VicesAiPage() {
               {/* Past weeks */}
               {weeks.length > 0 && (
                 <div className="mt-4">
-                  <p className="mb-1.5 text-[10px] font-bold uppercase tracking-[0.18em] text-stone-400">Past weeks</p>
+                  <p className="mb-1.5 text-[10px] font-bold uppercase tracking-[0.18em] text-[#7B818A]">Past weeks</p>
                   <div className="space-y-1.5">
                     {weeks.slice(0, 6).map((w) => {
                       const vd = VERDICTS[w.verdict];
                       return (
-                        <div key={w.week} className="flex items-center gap-3 rounded-xl border border-stone-900/10 bg-white/60 px-3.5 py-2">
-                          <span className={`flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-lg bg-gradient-to-br ${vd.grad} text-white`}>
+                        <div key={w.week} className="flex items-center gap-3 rounded-xl border border-white/10 bg-[#1C1F24] px-3.5 py-2">
+                          <span className={`flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-lg ${vd.grad} text-white`}>
                             {React.cloneElement(vd.icon as React.ReactElement, { className: "h-3.5 w-3.5" })}
                           </span>
                           <div className="min-w-0 flex-1">
-                            <p className="text-[12px] font-bold text-stone-800">{vd.title}</p>
-                            <p className="text-[9px] text-stone-400">Week of {w.week}</p>
+                            <p className="text-[12px] font-bold text-white">{vd.title}</p>
+                            <p className="text-[9px] text-[#7B818A]">Week of {w.week}</p>
                           </div>
-                          <p className="flex-shrink-0 text-[10px] tabular-nums text-stone-400">+{fmt(w.earned)} · −{fmt(w.spent)}</p>
+                          <p className="flex-shrink-0 text-[10px] tabular-nums text-[#7B818A]">+{fmt(w.earned)} · −{fmt(w.spent)}</p>
                         </div>
                       );
                     })}
@@ -1666,18 +1657,18 @@ export default function VicesAiPage() {
 
               {/* Lifetime tallies per item */}
               {([
-                { title: "Healthy logged", items: ALL_HABITS.filter((h) => (history[h.id] ?? 0) > 0), tint: "text-emerald-600" },
-                { title: "Vices enjoyed", items: ALL_VICES.filter((v) => (history[v.id] ?? 0) > 0), tint: "text-rose-600" },
+                { title: "Healthy logged", items: ALL_HABITS.filter((h) => (history[h.id] ?? 0) > 0), tint: "text-[#3BE08C]" },
+                { title: "Vices enjoyed", items: ALL_VICES.filter((v) => (history[v.id] ?? 0) > 0), tint: "text-[#6BA5FF]" },
               ] as const).map((sec) => sec.items.length > 0 && (
                 <div key={sec.title} className="mt-4">
-                  <p className="mb-1.5 text-[10px] font-bold uppercase tracking-[0.18em] text-stone-400">{sec.title}</p>
+                  <p className="mb-1.5 text-[10px] font-bold uppercase tracking-[0.18em] text-[#7B818A]">{sec.title}</p>
                   <div className="grid grid-cols-2 gap-1.5">
                     {sec.items.map((it) => (
-                      <div key={it.id} className="flex items-center gap-2.5 rounded-xl border border-stone-900/10 bg-white/60 px-3 py-2">
+                      <div key={it.id} className="flex items-center gap-2.5 rounded-xl border border-white/10 bg-[#1C1F24] px-3 py-2">
                         <span className={sec.tint}>{it.icon}</span>
                         <div className="min-w-0">
-                          <p className="text-[13px] font-black leading-none tabular-nums text-stone-900">{fmt(history[it.id])}</p>
-                          <p className="truncate text-[8px] uppercase tracking-wider text-stone-400">{(history[it.id] ?? 0) === 1 ? it.unitOne : it.unit}</p>
+                          <p className="text-[13px] font-black leading-none tabular-nums text-white">{fmt(history[it.id])}</p>
+                          <p className="truncate text-[8px] uppercase tracking-wider text-[#7B818A]">{(history[it.id] ?? 0) === 1 ? it.unitOne : it.unit}</p>
                         </div>
                       </div>
                     ))}
@@ -1686,18 +1677,101 @@ export default function VicesAiPage() {
               ))}
 
               {lifeEarned === 0 && lifeSpent === 0 && (
-                <p className="mt-6 mb-2 text-center text-[12px] italic text-stone-400">No history yet — log a habit or grab a vice to start your tally.</p>
+                <p className="mt-6 mb-2 text-center text-[12px] italic text-[#7B818A]">No history yet — log a habit or grab a vice to start your tally.</p>
               )}
             </div>
           </div>
         )}
 
+        {/* ─────────────── SETTINGS SHEET (resets) ─────────────── */}
+        {settingsOpen && (
+          <div className="absolute inset-0 z-40">
+            <div className="absolute inset-0 bg-black/60" onClick={() => { setSettingsOpen(false); setConfirmReset(null); }} />
+            <div className="no-scrollbar absolute inset-x-0 bottom-0 max-h-[82%] overflow-y-auto rounded-t-3xl border-t border-white/10 bg-[#121417] p-5" style={{ animation: "fadeUp .3s ease" }}>
+              <div className="mx-auto mb-4 h-1 w-10 rounded-full bg-white/12" />
+              <div className="mb-1 flex items-center gap-2">
+                <Settings className="h-4 w-4 text-[#8B9099]" />
+                <h3 className="text-xs font-bold uppercase tracking-[0.18em] text-[#8B9099]">Settings</h3>
+              </div>
+              <p className="mb-3 text-[11px] italic text-[#7B818A]">Restart your progress. Tap a reset twice to confirm.</p>
+              <div className="space-y-2">
+                {([
+                  { id: "week",    icon: <RotateCcw className="h-4 w-4" />,    label: "Reset this week",      sub: "Clear this week's points, tab & last move. Keeps all-time history.", danger: false, fn: resetWeek },
+                  { id: "streak",  icon: <Flame className="h-4 w-4" />,        label: "Reset day streak",     sub: `Set your ${streak}-day streak back to zero.`, danger: false, fn: resetStreak },
+                  { id: "history", icon: <Trash2 className="h-4 w-4" />,       label: "Clear all-time history", sub: "Wipe lifetime tallies and every past week.", danger: true, fn: resetHistory },
+                  { id: "all",     icon: <Trash2 className="h-4 w-4" />,       label: "Reset everything",     sub: "Full wipe — like a brand-new install.", danger: true, fn: resetAll },
+                ] as const).map((r) => {
+                  const armed = confirmReset === r.id;
+                  return (
+                    <button
+                      key={r.id}
+                      onClick={() => armOrRun(r.id, r.fn)}
+                      className={`press flex w-full items-center gap-3 rounded-xl border px-4 py-3 text-left transition-colors ${armed ? "border-[#F0524B] bg-[#F0524B]/10" : "border-white/10 bg-[#1C1F24] hover:bg-[#22262C]"}`}
+                    >
+                      <span className={`flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-lg ${armed ? "bg-[#F0524B] text-white" : r.danger ? "bg-[#F0524B]/15 text-[#FF6B66]" : "bg-[#252A30] text-[#AEB4BC]"}`}>
+                        {r.icon}
+                      </span>
+                      <span className="min-w-0 flex-1">
+                        <span className={`block text-[13px] font-bold ${armed ? "text-[#FF6B66]" : "text-white"}`}>{armed ? "Tap again to confirm" : r.label}</span>
+                        <span className="block text-[10px] text-[#7B818A]">{armed ? "This can't be undone." : r.sub}</span>
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+              <p className="mt-4 text-center text-[10px] text-[#7B818A]">Vices.ai · resets every Monday on its own, too.</p>
+            </div>
+          </div>
+        )}
+
+        {/* ─────────────── GOING-INTO-DEBT CONFIRM (Store) ─────────────── */}
+        {pendingBuy && (() => {
+          const v = pendingBuy;
+          const newDebt = round2(v.me - netME);              // what you'd owe after this
+          const due = loanDueAt ?? (Date.now() + LOAN_WINDOW_MS);
+          const interest = loanInterest(newDebt, due, Date.now());
+          return (
+            <div className="absolute inset-0 z-50 flex items-center justify-center p-6">
+              <div className="absolute inset-0 bg-black/65" onClick={() => setPendingBuy(null)} />
+              <div className="relative w-full max-w-[300px] overflow-hidden rounded-3xl border border-white/10 bg-[#FAF8F4] shadow-2xl" style={{ animation: "fadeUp .3s ease" }}>
+                <div className="flex flex-col items-center bg-[#F0524B] px-6 pb-5 pt-7 text-center text-white">
+                  <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-white/20" style={{ animation: "pop .5s ease" }}>
+                    <Receipt className="h-7 w-7" />
+                  </div>
+                  <p className="mt-3 text-[10px] font-bold uppercase tracking-[0.2em] text-white/80">Going on the tab</p>
+                  <h3 className="text-2xl font-black leading-tight">Hold up.</h3>
+                </div>
+                <div className="p-6 text-center">
+                  <p className="text-[13px] leading-relaxed text-[#AEB4BC]">
+                    You don&apos;t have the points for a <span className="font-bold text-white">{v.label.toLowerCase()}</span>. Put it on the tab and you&apos;ll owe <span className="font-black text-[#FF6B66]">{fmt(newDebt + interest)} pts</span> within <span className="font-bold">36 hours</span>.
+                  </p>
+                  <p className="mt-2 text-[11px] text-[#7B818A]">{fmt(newDebt)} borrowed + {fmt(interest)} interest · interest climbs if you&apos;re late.</p>
+                  <div className="mt-5 flex flex-col gap-2">
+                    <button
+                      onClick={() => { buyVice(v); setPendingBuy(null); }}
+                      className="press w-full rounded-xl bg-[#F0524B] py-3 text-[13px] font-semibold text-white hover:opacity-90"
+                    >
+                      Send it — put it on the tab
+                    </button>
+                    <button
+                      onClick={() => setPendingBuy(null)}
+                      className="press w-full rounded-xl border border-white/10 bg-[#1C1F24] py-3 text-[13px] font-bold text-[#C7CCD3] transition-colors hover:bg-[#23272E]"
+                    >
+                      Nope, I&apos;ll earn it first
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          );
+        })()}
+
         {/* ─────────────── MONDAY RECAP (verdict on the week that just ended) ─────────────── */}
         {splashGone && recap && (
           <div className="absolute inset-0 z-50 flex items-center justify-center p-6">
-            <div className="absolute inset-0 bg-stone-900/40 backdrop-blur-sm" onClick={() => setRecap(null)} />
-            <div className="relative w-full max-w-[300px] overflow-hidden rounded-3xl border border-stone-900/10 bg-[#FAF8F4] shadow-2xl" style={{ animation: "fadeUp .3s ease" }}>
-              <div className={`flex flex-col items-center bg-gradient-to-br ${VERDICTS[recap.verdict].grad} px-6 pb-5 pt-7 text-center text-white`}>
+            <div className="absolute inset-0 bg-black/65" onClick={() => setRecap(null)} />
+            <div className="relative w-full max-w-[300px] overflow-hidden rounded-3xl border border-white/10 bg-[#FAF8F4] shadow-2xl" style={{ animation: "fadeUp .3s ease" }}>
+              <div className={`flex flex-col items-center ${VERDICTS[recap.verdict].grad} px-6 pb-5 pt-7 text-center text-white`}>
                 <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-white/20" style={{ animation: "pop .5s ease" }}>
                   {VERDICTS[recap.verdict].icon}
                 </div>
@@ -1705,27 +1779,92 @@ export default function VicesAiPage() {
                 <h3 className="text-2xl font-black leading-tight">{VERDICTS[recap.verdict].title}</h3>
               </div>
               <div className="p-6 text-center">
-                <p className="text-[13px] leading-relaxed text-stone-600">{VERDICTS[recap.verdict].body}</p>
+                <p className="text-[13px] leading-relaxed text-[#AEB4BC]">{VERDICTS[recap.verdict].body}</p>
                 <div className="mt-4 flex justify-center gap-4 text-center">
                   <div>
-                    <p className="text-lg font-black tabular-nums text-emerald-600">{fmt(recap.earned)}</p>
-                    <p className="text-[8px] font-bold uppercase tracking-wider text-stone-400">Earned</p>
+                    <p className="text-lg font-black tabular-nums text-[#3BE08C]">{fmt(recap.earned)}</p>
+                    <p className="text-[8px] font-bold uppercase tracking-wider text-[#7B818A]">Earned</p>
                   </div>
                   <div>
-                    <p className="text-lg font-black tabular-nums text-rose-600">{fmt(recap.spent)}</p>
-                    <p className="text-[8px] font-bold uppercase tracking-wider text-stone-400">Spent</p>
+                    <p className="text-lg font-black tabular-nums text-[#6BA5FF]">{fmt(recap.spent)}</p>
+                    <p className="text-[8px] font-bold uppercase tracking-wider text-[#7B818A]">Spent</p>
                   </div>
                 </div>
-                <button
-                  onClick={() => setRecap(null)}
-                  className="press mt-5 w-full rounded-xl bg-stone-900 py-3 text-[13px] font-bold text-white transition-colors hover:bg-stone-700"
-                >
-                  Start the week fresh
-                </button>
+                <div className="mt-5 flex gap-2">
+                  <button
+                    onClick={() => shareWeek(recap.earned, recap.spent)}
+                    className="press flex flex-1 items-center justify-center gap-2 rounded-xl bg-[#1FD173] py-3 text-[13px] font-semibold text-white transition-colors hover:bg-[#16B863]"
+                  >
+                    <Share2 className="h-4 w-4" /> Share
+                  </button>
+                  <button
+                    onClick={() => setRecap(null)}
+                    className="press flex-1 rounded-xl border border-white/10 bg-[#1C1F24] py-3 text-[13px] font-bold text-[#C7CCD3] transition-colors hover:bg-[#23272E]"
+                  >
+                    Start fresh
+                  </button>
+                </div>
               </div>
             </div>
           </div>
         )}
+
+        {/* ─────────────── YOUR WEEK, WRAPPED (shareable card · Idea 3) ─────────────── */}
+        {splashGone && wrappedOpen && (() => {
+          const vd = VERDICTS[weekVerdict(earnedME, spentME)];
+          const bal = Math.round(moderationOf({ earned: earnedME, spent: spentME }) * 100);
+          return (
+            <div className="absolute inset-0 z-50 flex items-center justify-center p-5">
+              <div className="absolute inset-0 bg-black/70" onClick={() => setWrappedOpen(false)} />
+              <div className="relative w-full max-w-[320px] overflow-hidden rounded-[28px] shadow-2xl" style={{ animation: "pop .35s ease" }}>
+                {/* Gradient poster — built to be screenshotted */}
+                <div className={`relative ${vd.grad} p-6 text-white`}>
+                  <div className="pointer-events-none absolute inset-0 opacity-25 bg-[radial-gradient(circle_at_82%_8%,#fff,transparent_40%),radial-gradient(circle_at_8%_92%,#fff,transparent_35%)]" />
+                  <div className="relative">
+                    <div className="flex items-center justify-between">
+                      <span className="flex items-center gap-1.5 text-[11px] font-black uppercase tracking-[0.2em]"><Scale className="h-3.5 w-3.5" /> Vices.ai</span>
+                      <button onClick={() => setWrappedOpen(false)} className="press flex h-7 w-7 items-center justify-center rounded-full bg-white/20 text-sm font-black leading-none" aria-label="Close">×</button>
+                    </div>
+                    <p className="mt-5 text-[10px] font-bold uppercase tracking-[0.22em] text-white/80">Your week, wrapped</p>
+                    <h3 className="text-3xl font-black leading-none">{vd.title}</h3>
+                    <div className="mt-5 grid grid-cols-2 gap-2.5">
+                      {([
+                        { v: `${fmt(earnedME)}`, l: "Earned" },
+                        { v: `${fmt(spentME)}`, l: "Spent" },
+                        { v: `${bal}`, l: "Balance", suf: "/100" },
+                      ] as const).map((s) => (
+                        <div key={s.l} className="rounded-2xl bg-white/15 p-3">
+                          <p className="text-2xl font-black leading-none tabular-nums">{s.v}{"suf" in s && <span className="text-sm">{s.suf}</span>}</p>
+                          <p className="mt-1 text-[9px] font-bold uppercase tracking-wider text-white/80">{s.l}</p>
+                        </div>
+                      ))}
+                      <div className="rounded-2xl bg-white/15 p-3">
+                        <p className="flex items-center gap-1 text-2xl font-black leading-none tabular-nums">{streak} <Flame className="h-5 w-5" /></p>
+                        <p className="mt-1 text-[9px] font-bold uppercase tracking-wider text-white/80">Day streak</p>
+                      </div>
+                    </div>
+                    <p className="mt-4 text-[12.5px] font-semibold leading-snug text-white/90">{vd.body}</p>
+                  </div>
+                </div>
+                {/* Footer actions on white */}
+                <div className="flex gap-2 bg-[#1C1F24] p-4">
+                  <button
+                    onClick={() => shareWeek(earnedME, spentME)}
+                    className="press flex flex-1 items-center justify-center gap-2 rounded-xl bg-[#1FD173] py-3 text-[13px] font-semibold text-white transition-colors hover:bg-[#16B863]"
+                  >
+                    <Share2 className="h-4 w-4" /> Share my week
+                  </button>
+                  <button
+                    onClick={() => setWrappedOpen(false)}
+                    className="press rounded-xl border border-white/10 bg-[#1C1F24] px-4 py-3 text-[13px] font-bold text-[#AEB4BC] transition-colors hover:bg-[#23272E]"
+                  >
+                    Close
+                  </button>
+                </div>
+              </div>
+            </div>
+          );
+        })()}
       </div>
     </div>
   );

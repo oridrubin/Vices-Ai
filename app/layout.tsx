@@ -2,17 +2,14 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Vices AI",
-  description: "Earn your vices. Balance your sins.",
+  title: "Vices.ai",
+  description: "Track healthy habits, earn points, and spend them on your vices.",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en">
-      <body>
-        <div className="scanline-overlay" />
-        {children}
-      </body>
+      <body>{children}</body>
     </html>
   );
 }

@@ -9,6 +9,13 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
+        clay: "#C25A3A",
+        gold: "#D8A53C",
+        plum: "#9C5B82",
+        ocean: "#3C97A6",
+        brand: "#1FD173",
+        spend: "#3B82F6",
+        danger: "#F0524B",
         neonpink: "#FF007F",
         neonpink2: "#FF0066",
         electricyellow: "#FFF200",
