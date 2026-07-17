@@ -335,7 +335,7 @@ const VERDICTS: Record<VerdictId, Verdict> = {
   },
   balanced: {
     id: "balanced", title: "Balanced week", body: "You earned and spent about the same amount. That's the goal.",
-    icon: <Scale className="h-7 w-7" />, grad: "bg-[#1FD173]", text: "text-[#3BE08C]",
+    icon: <Scale className="h-7 w-7" />, grad: "bg-[#22C55E]", text: "text-[#4ADE80]",
   },
   degen: {
     id: "degen", title: "Degen week", body: "You spent more than you earned and went on the tab. Earn it back next week.",
@@ -407,7 +407,7 @@ const engagement = (f: { earned: number; spent: number }): number =>
 
 /** Status dot colour for any balance — yours or a friend's. */
 const dotFor = (pts: number): string =>
-  pts > 2.5 ? "bg-[#1FD173]" : pts < -2.5 ? "bg-[#F0524B]" : "bg-[#565B62]";
+  pts > 2.5 ? "bg-[#22C55E]" : pts < -2.5 ? "bg-[#F0524B]" : "bg-[#565B62]";
 
 type MetricId = "balanced" | "degen" | "dork";
 
@@ -433,8 +433,8 @@ const METRICS: Metric[] = [
     unit: "balance",
     icon: <Scale className="w-4 h-4" />,
     score: (f) => Math.round(moderationOf(f) * 100 * engagement(f)),
-    text: "text-[#3BE08C]",
-    chipOn: "border-[#1FD173] bg-[#1FD173] text-white",
+    text: "text-[#4ADE80]",
+    chipOn: "border-[#22C55E] bg-[#22C55E] text-white",
     glow: "",
   },
   {
@@ -544,9 +544,9 @@ const coachBucket = (earned: number, spent: number, onTab: boolean): CoachBucket
 
 /** Icon-bubble tint per coach mood. */
 const COACH_TINT: Record<CoachBucket, string> = {
-  start: "bg-[#1FD173]/15 text-[#3BE08C]",
+  start: "bg-[#22C55E]/15 text-[#4ADE80]",
   dork: "bg-gold/10 text-[#E6B65A]",
-  balanced: "bg-[#1FD173]/15 text-[#3BE08C]",
+  balanced: "bg-[#22C55E]/15 text-[#4ADE80]",
   tab: "bg-[#F0524B]/15 text-[#FF6B66]",
   loose: "bg-[#F0524B]/15 text-[#FF6B66]",
   neutral: "bg-[#252A30] text-[#AEB4BC]",
@@ -562,7 +562,7 @@ const ONBOARD: { icon: React.ReactNode; title: string; body: string; mode: Mode 
 ];
 
 /** Confetti palettes for the log-entry burst. */
-const CONFETTI_GOOD = ["#1FD173", "#34d399", "#0ea5e9", "#a3e635"];
+const CONFETTI_GOOD = ["#22C55E", "#34d399", "#0ea5e9", "#a3e635"];
 const CONFETTI_BAD = ["#f59e0b", "#fb923c", "#3B82F6", "#facc15"];
 
 /** One in-flight log celebration: a particle shower off the log button. */
@@ -831,7 +831,7 @@ export default function VicesAiPage() {
   // ── Life Balance status (three glowing-dot states) ──────────────────────
   const status =
     netME > 2.5
-      ? { label: "Ahead",  dot: "bg-[#1FD173]", text: "text-[#3BE08C]", glow: "" }
+      ? { label: "Ahead",  dot: "bg-[#22C55E]", text: "text-[#4ADE80]", glow: "" }
       : netME < -2.5
       ? { label: "Behind", dot: "bg-[#F0524B]",    text: "text-[#FF6B66]",    glow: "" }
       : { label: "Even",   dot: "bg-[#7B818A]",   text: "text-[#8B9099]",   glow: "" };
@@ -1003,10 +1003,10 @@ export default function VicesAiPage() {
 
   // ── Mode-dependent accent classes (vibrant on eggshell) ─────────────────
   const accent = {
-    text: "text-[#3BE08C]",
+    text: "text-[#4ADE80]",
     slider: "",
-    chip: "border-[#1FD173] bg-[#1FD173]/15 text-[#3BE08C]",
-    btn: "bg-[#1FD173] hover:bg-[#16B863]",
+    chip: "border-[#22C55E] bg-[#22C55E]/15 text-[#4ADE80]",
+    btn: "bg-[#22C55E] hover:bg-[#16A34A]",
   };
 
   const glass = "rounded-xl border border-[#2A2F36] bg-[#1C1F24]";
@@ -1021,8 +1021,8 @@ export default function VicesAiPage() {
         .no-scrollbar::-webkit-scrollbar { display: none; }
         .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
         .vslider { -webkit-appearance: none; appearance: none; width: 100%; height: 6px; border-radius: 9999px; background: #3A3F46; outline: none; }
-        .vslider::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; width: 18px; height: 18px; border-radius: 9999px; cursor: pointer; background: #1FD173; }
-        .vslider::-moz-range-thumb { width: 18px; height: 18px; border: none; border-radius: 9999px; cursor: pointer; background: #1FD173; }
+        .vslider::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; width: 18px; height: 18px; border-radius: 9999px; cursor: pointer; background: #22C55E; }
+        .vslider::-moz-range-thumb { width: 18px; height: 18px; border: none; border-radius: 9999px; cursor: pointer; background: #22C55E; }
         .press { transition: transform .12s ease; }
         .press:active { transform: scale(0.97); }
         @keyframes loadbar { from { width: 0%; } to { width: 100%; } }
@@ -1042,15 +1042,15 @@ export default function VicesAiPage() {
         {/* ─────────────── SPLASH / LOADING SCREEN ─────────────── */}
         {!splashGone && (
           <div className={`absolute inset-0 z-50 flex flex-col items-center justify-center bg-[#121417] transition-opacity duration-500 ${splashFading ? "opacity-0" : "opacity-100"}`}>
-            <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-[#1FD173]">
+            <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-[#22C55E]">
               <Scale className="h-8 w-8 text-white" />
             </div>
             <h1 className="mt-5 text-3xl font-bold tracking-tight text-white">
-              Vices<span className="text-[#3BE08C]">.ai</span>
+              Vices<span className="text-[#4ADE80]">.ai</span>
             </h1>
             <p className="mt-2 text-sm text-[#8B9099]">Earn your vices.</p>
             <div className="mt-7 h-1 w-36 overflow-hidden rounded-full bg-[#2A2F36]">
-              <div className="h-full rounded-full bg-[#1FD173]" style={{ animation: "loadbar 2.2s ease-out forwards" }} />
+              <div className="h-full rounded-full bg-[#22C55E]" style={{ animation: "loadbar 2.2s ease-out forwards" }} />
             </div>
           </div>
         )}
@@ -1074,14 +1074,14 @@ export default function VicesAiPage() {
               >
                 Skip
               </button>
-              <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-[#1FD173] text-white">
+              <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-[#22C55E] text-white">
                 {ONBOARD[onboardStep].icon}
               </div>
-              <h3 className="mt-4 text-lg font-black leading-tight text-[#14171B]">{ONBOARD[onboardStep].title}</h3>
+              <h3 className="mt-4 text-lg font-bold leading-tight text-[#14171B]">{ONBOARD[onboardStep].title}</h3>
               <p className="mt-1.5 text-[13px] leading-relaxed text-[#525862]">{ONBOARD[onboardStep].body}</p>
               <div className="mt-5 flex items-center gap-1.5">
                 {ONBOARD.map((_, i) => (
-                  <span key={i} className={`h-1.5 rounded-full transition-all ${i === onboardStep ? "w-5 bg-[#1FD173]" : "w-1.5 bg-black/15"}`} />
+                  <span key={i} className={`h-1.5 rounded-full transition-all ${i === onboardStep ? "w-5 bg-[#22C55E]" : "w-1.5 bg-black/15"}`} />
                 ))}
               </div>
               <div className="mt-5 flex items-center gap-2">
@@ -1095,7 +1095,7 @@ export default function VicesAiPage() {
                 )}
                 <button
                   onClick={() => (onboardStep === ONBOARD.length - 1 ? dismissOnboard() : setOnboardStep((s) => s + 1))}
-                  className="press flex-1 rounded-xl bg-[#1FD173] py-3 text-[13px] font-semibold text-white transition-colors hover:bg-[#16B863]"
+                  className="press flex-1 rounded-xl bg-[#22C55E] py-3 text-[13px] font-semibold text-white transition-colors hover:bg-[#16A34A]"
                 >
                   {onboardStep === ONBOARD.length - 1 ? "Let's go" : "Next"}
                 </button>
@@ -1110,11 +1110,11 @@ export default function VicesAiPage() {
           {/* ── HEADER: brand + live balance pill ── */}
           <header className="flex flex-shrink-0 items-start justify-between">
             <div className="flex items-center gap-2.5">
-              <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#1FD173]">
+              <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#22C55E]">
                 <Scale className="h-4 w-4 text-white" />
               </div>
-              <h1 className="text-lg font-black leading-none tracking-tight text-white">
-                Vices<span className="text-[#3BE08C]">.ai</span>
+              <h1 className="text-lg font-bold leading-none tracking-tight text-white">
+                Vices<span className="text-[#4ADE80]">.ai</span>
               </h1>
             </div>
             <div className="flex items-center gap-2">
@@ -1129,7 +1129,7 @@ export default function VicesAiPage() {
                 <div className="flex items-center gap-1.5 rounded-full border border-white/10 bg-[#1C1F24] px-2.5 py-1">
                   <span className={`h-1.5 w-1.5 animate-pulse rounded-full ${status.dot} ${status.glow}`} />
                   <span className={`text-[10px] font-semibold ${status.text}`}>{status.label}</span>
-                  <span className={`text-[11px] font-black tabular-nums ${status.text}`}>
+                  <span className={`text-[11px] font-bold tabular-nums ${status.text}`}>
                     {netME >= 0 ? "+" : ""}{fmt(netME)} pts
                   </span>
                 </div>
@@ -1147,7 +1147,7 @@ export default function VicesAiPage() {
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-[11px] font-semibold text-[#7B818A]">{greeting()}</p>
-                    <h2 className="text-lg font-black leading-tight text-white">Here&apos;s your balance</h2>
+                    <h2 className="text-lg font-bold leading-tight text-white">Here&apos;s your balance</h2>
                   </div>
                   <div className="flex items-center gap-2">
                     <button
@@ -1173,7 +1173,7 @@ export default function VicesAiPage() {
                     </button>
                     <button
                       onClick={() => setMode("allowance")}
-                      className="press flex items-center gap-1 rounded-full bg-[#1FD173] px-3.5 py-2 text-[11px] font-semibold text-white hover:bg-[#16B863]"
+                      className="press flex items-center gap-1 rounded-full bg-[#22C55E] px-3.5 py-2 text-[11px] font-semibold text-white hover:bg-[#16A34A]"
                     >
                       <Zap className="h-3.5 w-3.5" /> Log
                     </button>
@@ -1192,7 +1192,7 @@ export default function VicesAiPage() {
                     </span>
                     <div className="min-w-0 flex-1">
                       <p className="text-[9px] font-bold uppercase tracking-[0.18em] text-white/80">{tabOverdue ? "Tab overdue" : "On the tab"}</p>
-                      <p className="text-lg font-black leading-tight">You owe {fmt(tabOwed)} pts</p>
+                      <p className="text-lg font-bold leading-tight">You owe {fmt(tabOwed)} pts</p>
                       <p className="text-[10px] text-white/85">
                         {fmt(debt)} borrowed + {fmt(tabInterest)} interest · {tabOverdue ? `overdue ${fmtCountdown(loanDueAt as number, now)}` : `${fmtCountdown(loanDueAt as number, now)} left`}
                       </p>
@@ -1211,7 +1211,7 @@ export default function VicesAiPage() {
                         <circle cx="66" cy="66" r="58" fill="none" stroke="rgba(31,209,115,0.22)" strokeWidth="11" />
                         <circle cx="66" cy="66" r="44" fill="none" stroke="rgba(59,130,246,0.20)" strokeWidth="11" />
                         <circle
-                          cx="66" cy="66" r="58" fill="none" stroke="#1FD173" strokeWidth="11" strokeLinecap="round"
+                          cx="66" cy="66" r="58" fill="none" stroke="#22C55E" strokeWidth="11" strokeLinecap="round"
                           strokeDasharray={2 * Math.PI * 58} strokeDashoffset={2 * Math.PI * 58 * (1 - goalProgress)}
                           style={{ transition: "stroke-dashoffset .6s ease" }}
                         />
@@ -1229,17 +1229,17 @@ export default function VicesAiPage() {
                     <div className="flex-1 space-y-3">
                       <div>
                         <div className="flex items-center gap-1.5">
-                          <span className="h-2 w-2 rounded-full bg-[#1FD173]" />
+                          <span className="h-2 w-2 rounded-full bg-[#22C55E]" />
                           <span className="text-[10px] font-bold uppercase tracking-wider text-[#7B818A]">Earned</span>
                         </div>
-                        <p className="text-xl font-black tabular-nums text-[#3BE08C]">{fmt(earnedME)} <span className="text-xs font-semibold text-[#7B818A]">/ {WEEKLY_GOAL}</span></p>
+                        <p className="text-xl font-extrabold tabular-nums text-[#4ADE80]">{fmt(earnedME)} <span className="text-xs font-semibold text-[#7B818A]">/ {WEEKLY_GOAL}</span></p>
                       </div>
                       <div>
                         <div className="flex items-center gap-1.5">
                           <span className="h-2 w-2 rounded-full bg-[#3B82F6]" />
                           <span className="text-[10px] font-bold uppercase tracking-wider text-[#7B818A]">Spent</span>
                         </div>
-                        <p className="text-xl font-black tabular-nums text-[#6BA5FF]">{fmt(spentME)} <span className="text-xs font-semibold text-[#7B818A]">pts</span></p>
+                        <p className="text-xl font-extrabold tabular-nums text-[#6BA5FF]">{fmt(spentME)} <span className="text-xs font-semibold text-[#7B818A]">pts</span></p>
                       </div>
                     </div>
                   </div>
@@ -1266,7 +1266,7 @@ export default function VicesAiPage() {
                     <span className="text-[11px] font-bold tabular-nums text-[#8B9099]">{fmt(earnedME)} / {WEEKLY_GOAL}</span>
                   </div>
                   <div className="h-2.5 overflow-hidden rounded-full bg-white/10">
-                    <div className="h-full rounded-full bg-[#1FD173]" style={{ width: `${goalProgress * 100}%`, transition: "width .6s ease" }} />
+                    <div className="h-full rounded-full bg-[#22C55E]" style={{ width: `${goalProgress * 100}%`, transition: "width .6s ease" }} />
                   </div>
                   <p className="mt-2 text-[10px] text-[#7B818A]">
                     {goalProgress >= 1 ? "Goal smashed — you've earned the weekend." : `${fmt(WEEKLY_GOAL - earnedME)} pts to hit this week's goal.`}
@@ -1300,7 +1300,7 @@ export default function VicesAiPage() {
                   />
                   <button
                     onClick={addFriend}
-                    className="press flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl bg-[#1FD173] text-white transition-colors hover:bg-[#16B863]"
+                    className="press flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl bg-[#22C55E] text-white transition-colors hover:bg-[#16A34A]"
                     aria-label="Add friend"
                   >
                     <UserPlus className="h-4 w-4" />
@@ -1340,16 +1340,16 @@ export default function VicesAiPage() {
                       return (
                         <div
                           key={f.name}
-                          className={`relative flex flex-col items-center gap-0.5 rounded-2xl border px-1.5 text-center ${first ? "border-white/12 bg-[#1C1F24] pb-3.5 pt-5 shadow-xl" : "border-white/10 bg-[#1C1F24] py-3"} ${f.you ? "ring-2 ring-[#1FD173]/60" : ""}`}
+                          className={`relative flex flex-col items-center gap-0.5 rounded-2xl border px-1.5 text-center ${first ? "border-white/12 bg-[#1C1F24] pb-3.5 pt-5 shadow-xl" : "border-white/10 bg-[#1C1F24] py-3"} ${f.you ? "ring-2 ring-[#22C55E]/60" : ""}`}
                           style={
                             first
                               ? ({ animation: "fadeUp .45s ease both" } as React.CSSProperties)
                               : { animation: `fadeUp .4s ease ${ci * 80}ms both` }
                           }
                         >
-                          <span className="flex h-5 w-5 items-center justify-center rounded-full bg-[#1FD173] text-[9px] font-bold text-white">{rank}</span>
+                          <span className="flex h-5 w-5 items-center justify-center rounded-full bg-[#22C55E] text-[9px] font-bold text-white">{rank}</span>
                           <p className="w-full truncate text-[11px] font-bold text-white">{f.name}</p>
-                          <p className={`text-lg font-black leading-none tabular-nums ${activeMetric.text}`}>{fmt(activeMetric.score(f))}</p>
+                          <p className={`text-lg font-bold leading-none tabular-nums ${activeMetric.text}`}>{fmt(activeMetric.score(f))}</p>
                           <p className="text-[7px] uppercase tracking-wider text-[#7B818A]">{activeMetric.unit}</p>
                         </div>
                       );
@@ -1383,7 +1383,17 @@ export default function VicesAiPage() {
                 <h2 className={`text-xs font-bold uppercase tracking-[0.18em] ${accent.text}`}>Vices Store</h2>
 
                 {/* Wallet banner — spendable balance, or the live tab when you owe */}
-                <div className={`relative flex flex-shrink-0 items-center gap-3 overflow-hidden rounded-2xl px-4 py-3.5 text-white ${onTab ? "bg-[#F0524B]" : "bg-[#1FD173]"}`}>
+                <div
+                  className="relative flex flex-shrink-0 items-center gap-3 overflow-hidden rounded-2xl border border-white/10 px-4 py-3.5 text-white"
+                  style={{
+                    background: onTab
+                      ? "linear-gradient(135deg, #F4685F 0%, #E23B32 100%)"
+                      : "linear-gradient(135deg, #2FD968 0%, #15A048 100%)",
+                    boxShadow: onTab
+                      ? "inset 0 1px 0 rgba(255,255,255,0.20), 0 10px 28px -12px rgba(226,59,50,0.55)"
+                      : "inset 0 1px 0 rgba(255,255,255,0.20), 0 10px 28px -12px rgba(21,160,72,0.55)",
+                  }}
+                >
                   {burst && (
                     <div className="pointer-events-none absolute inset-0 z-10">
                       {burst.parts.map((p) => (
@@ -1411,7 +1421,7 @@ export default function VicesAiPage() {
                     <div key={cat.id}>
                       <div className={`mb-1.5 flex items-center gap-1.5 ${th.label}`}>
                         {cat.icon}
-                        <span className="text-[10px] font-black uppercase tracking-[0.18em]">{cat.label}</span>
+                        <span className="text-[10px] font-semibold uppercase tracking-[0.18em]">{cat.label}</span>
                       </div>
                       <div className="grid grid-cols-2 gap-2">
                         {cat.vices.map((v, vi) => {
@@ -1451,7 +1461,7 @@ export default function VicesAiPage() {
                   onClick={openHabitSheet}
                   className="press flex w-full items-center gap-3 rounded-2xl border border-white/10 bg-[#1C1F24] px-4 py-3.5 text-left shadow-sm transition-colors hover:bg-[#22262C]"
                 >
-                  <span className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl bg-[#1FD173]/10 text-[#3BE08C]">
+                  <span className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl bg-[#22C55E]/10 text-[#4ADE80]">
                     {item.icon}
                   </span>
                   <span className="min-w-0 flex-1">
@@ -1494,7 +1504,7 @@ export default function VicesAiPage() {
                         style={{ animation: `fadeUp .25s ease ${i * 50}ms both` }}
                       >
                         <span className={accent.text}>{v.icon}</span>
-                        <span className="text-xl font-black leading-none tabular-nums text-white">{n}</span>
+                        <span className="text-xl font-extrabold leading-none tabular-nums text-white">{n}</span>
                         <span className="text-[8px] uppercase tracking-wider text-[#7B818A]">{n === 1 ? v.unitOne : v.unit}</span>
                       </div>
                     ))}
@@ -1509,12 +1519,12 @@ export default function VicesAiPage() {
                   <div className="flex items-center justify-between">
                     <span className="text-[9px] font-semibold uppercase tracking-[0.18em] text-[#7B818A]">This week</span>
                     <span className="text-[10px] tabular-nums">
-                      <span className="font-bold text-[#3BE08C]">+{fmt(earnedME)}</span> earned&nbsp;·&nbsp;
+                      <span className="font-bold text-[#4ADE80]">+{fmt(earnedME)}</span> earned&nbsp;·&nbsp;
                       <span className="font-bold text-[#6BA5FF]">−{fmt(spentME)}</span> spent
                     </span>
                   </div>
                   <div className="mt-2.5 h-2 overflow-hidden rounded-full bg-white/10">
-                    <div className="h-full rounded-full bg-[#1FD173]" style={{ width: `${goalProgress * 100}%`, transition: "width .6s ease" }} />
+                    <div className="h-full rounded-full bg-[#22C55E]" style={{ width: `${goalProgress * 100}%`, transition: "width .6s ease" }} />
                   </div>
                   <p className="mt-1.5 text-[9px] text-[#7B818A]">
                     {goalProgress >= 1 ? "Weekly goal smashed — enjoy yourself." : `${fmt(WEEKLY_GOAL - earnedME)} pts to your weekly goal.`}
@@ -1552,7 +1562,7 @@ export default function VicesAiPage() {
               <button
                 key={id}
                 onClick={() => setMode(id)}
-                className={`press flex flex-1 flex-col items-center gap-1 rounded-xl py-2 transition-colors ${mode === id ? "bg-[#1FD173] text-white" : "text-[#7B818A] hover:text-[#AEB4BC]"}`}
+                className={`press flex flex-1 flex-col items-center gap-1 rounded-xl py-2 transition-colors ${mode === id ? "bg-[#22C55E] text-white" : "text-[#7B818A] hover:text-[#AEB4BC]"}`}
               >
                 <span style={mode === id ? { animation: "pop .3s ease" } : undefined}>{icon}</span>
                 <span className="text-[9px] font-semibold">{label}</span>
@@ -1571,7 +1581,7 @@ export default function VicesAiPage() {
             <ShoppingBag className="h-3.5 w-3.5 text-white" />
             <span className="text-[12px] font-semibold">{toast.text}</span>
             {toast.pts !== 0 && (
-              <span className="text-[12px] font-black tabular-nums text-white">{toast.pts < 0 ? "−" : "+"}{fmt(Math.abs(toast.pts))} pts</span>
+              <span className="text-[12px] font-bold tabular-nums text-white">{toast.pts < 0 ? "−" : "+"}{fmt(Math.abs(toast.pts))} pts</span>
             )}
           </div>
         )}
@@ -1594,12 +1604,12 @@ export default function VicesAiPage() {
                         onClick={() => (single ? selectHabit(cat.options[0]) : setOpenHabitCat(open ? "" : cat.id))}
                         className="press flex w-full items-center gap-3 px-4 py-3 transition-colors hover:bg-[#22262C]/5"
                       >
-                        <span className="text-[#3BE08C]">{cat.icon}</span>
+                        <span className="text-[#4ADE80]">{cat.icon}</span>
                         <span className="flex-1 text-left text-sm font-semibold text-white">{cat.label}</span>
                         {single ? (
                           <>
                             <span className="text-[10px] text-[#7B818A]">{fmt(cat.options[0].me)} pts</span>
-                            {habitId === cat.options[0].id && <Check className="h-3.5 w-3.5 text-[#3BE08C]" />}
+                            {habitId === cat.options[0].id && <Check className="h-3.5 w-3.5 text-[#4ADE80]" />}
                           </>
                         ) : (
                           <ChevronDown className={`h-4 w-4 text-[#7B818A] transition-transform duration-200 ${open ? "rotate-180" : ""}`} />
@@ -1617,7 +1627,7 @@ export default function VicesAiPage() {
                               <span className="text-[#7B818A]">{h.icon}</span>
                               <span className="flex-1 text-left text-[13px] text-[#C7CCD3]">{h.label}</span>
                               <span className="text-[10px] text-[#7B818A]">{fmt(h.me)} pts</span>
-                              {habitId === h.id && <Check className="h-3.5 w-3.5 text-[#3BE08C]" />}
+                              {habitId === h.id && <Check className="h-3.5 w-3.5 text-[#4ADE80]" />}
                             </button>
                           ))}
                         </div>
@@ -1641,12 +1651,12 @@ export default function VicesAiPage() {
               {/* All-time totals */}
               <div className="grid grid-cols-3 gap-2">
                 {([
-                  { label: "Earned", value: lifeEarned, cls: "text-[#3BE08C]" },
+                  { label: "Earned", value: lifeEarned, cls: "text-[#4ADE80]" },
                   { label: "Spent", value: lifeSpent, cls: "text-[#6BA5FF]" },
                   { label: "Net", value: round2(lifeEarned - lifeSpent), cls: "text-white" },
                 ] as const).map((s) => (
                   <div key={s.label} className="rounded-xl border border-white/10 bg-[#1C1F24] px-3 py-2.5 text-center">
-                    <p className={`text-lg font-black leading-none tabular-nums ${s.cls}`}>{fmt(s.value)}</p>
+                    <p className={`text-lg font-bold leading-none tabular-nums ${s.cls}`}>{fmt(s.value)}</p>
                     <p className="mt-1 text-[8px] font-bold uppercase tracking-wider text-[#7B818A]">{s.label} pts</p>
                   </div>
                 ))}
@@ -1678,7 +1688,7 @@ export default function VicesAiPage() {
 
               {/* Lifetime tallies per item */}
               {([
-                { title: "Healthy logged", items: ALL_HABITS.filter((h) => (history[h.id] ?? 0) > 0), tint: "text-[#3BE08C]" },
+                { title: "Healthy logged", items: ALL_HABITS.filter((h) => (history[h.id] ?? 0) > 0), tint: "text-[#4ADE80]" },
                 { title: "Vices enjoyed", items: ALL_VICES.filter((v) => (history[v.id] ?? 0) > 0), tint: "text-[#6BA5FF]" },
               ] as const).map((sec) => sec.items.length > 0 && (
                 <div key={sec.title} className="mt-4">
@@ -1688,7 +1698,7 @@ export default function VicesAiPage() {
                       <div key={it.id} className="flex items-center gap-2.5 rounded-xl border border-white/10 bg-[#1C1F24] px-3 py-2">
                         <span className={sec.tint}>{it.icon}</span>
                         <div className="min-w-0">
-                          <p className="text-[13px] font-black leading-none tabular-nums text-white">{fmt(history[it.id])}</p>
+                          <p className="text-[13px] font-bold leading-none tabular-nums text-white">{fmt(history[it.id])}</p>
                           <p className="truncate text-[8px] uppercase tracking-wider text-[#7B818A]">{(history[it.id] ?? 0) === 1 ? it.unitOne : it.unit}</p>
                         </div>
                       </div>
@@ -1716,9 +1726,9 @@ export default function VicesAiPage() {
               </div>
               <button
                 onClick={() => { setSettingsOpen(false); setConfirmReset(null); setOnboardStep(0); }}
-                className="press mb-4 flex w-full items-center gap-3 rounded-xl border border-[#1FD173]/30 bg-[#1FD173]/10 px-4 py-3 text-left transition-colors hover:bg-[#1FD173]/15"
+                className="press mb-4 flex w-full items-center gap-3 rounded-xl border border-[#22C55E]/30 bg-[#22C55E]/10 px-4 py-3 text-left transition-colors hover:bg-[#22C55E]/15"
               >
-                <span className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-lg bg-[#1FD173] text-white">
+                <span className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-lg bg-[#22C55E] text-white">
                   <Compass className="h-4 w-4" />
                 </span>
                 <span className="min-w-0 flex-1">
@@ -1815,18 +1825,18 @@ export default function VicesAiPage() {
                 <p className="text-[13px] leading-relaxed text-[#AEB4BC]">{VERDICTS[recap.verdict].body}</p>
                 <div className="mt-4 flex justify-center gap-4 text-center">
                   <div>
-                    <p className="text-lg font-black tabular-nums text-[#3BE08C]">{fmt(recap.earned)}</p>
+                    <p className="text-lg font-bold tabular-nums text-[#4ADE80]">{fmt(recap.earned)}</p>
                     <p className="text-[8px] font-bold uppercase tracking-wider text-[#7B818A]">Earned</p>
                   </div>
                   <div>
-                    <p className="text-lg font-black tabular-nums text-[#6BA5FF]">{fmt(recap.spent)}</p>
+                    <p className="text-lg font-bold tabular-nums text-[#6BA5FF]">{fmt(recap.spent)}</p>
                     <p className="text-[8px] font-bold uppercase tracking-wider text-[#7B818A]">Spent</p>
                   </div>
                 </div>
                 <div className="mt-5 flex gap-2">
                   <button
                     onClick={() => shareWeek(recap.earned, recap.spent)}
-                    className="press flex flex-1 items-center justify-center gap-2 rounded-xl bg-[#1FD173] py-3 text-[13px] font-semibold text-white transition-colors hover:bg-[#16B863]"
+                    className="press flex flex-1 items-center justify-center gap-2 rounded-xl bg-[#22C55E] py-3 text-[13px] font-semibold text-white transition-colors hover:bg-[#16A34A]"
                   >
                     <Share2 className="h-4 w-4" /> Share
                   </button>
@@ -1855,8 +1865,8 @@ export default function VicesAiPage() {
                   <div className="pointer-events-none absolute inset-0 opacity-25 bg-[radial-gradient(circle_at_82%_8%,#fff,transparent_40%),radial-gradient(circle_at_8%_92%,#fff,transparent_35%)]" />
                   <div className="relative">
                     <div className="flex items-center justify-between">
-                      <span className="flex items-center gap-1.5 text-[11px] font-black uppercase tracking-[0.2em]"><Scale className="h-3.5 w-3.5" /> Vices.ai</span>
-                      <button onClick={() => setWrappedOpen(false)} className="press flex h-7 w-7 items-center justify-center rounded-full bg-white/20 text-sm font-black leading-none" aria-label="Close">×</button>
+                      <span className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-[0.2em]"><Scale className="h-3.5 w-3.5" /> Vices.ai</span>
+                      <button onClick={() => setWrappedOpen(false)} className="press flex h-7 w-7 items-center justify-center rounded-full bg-white/20 text-sm font-bold leading-none" aria-label="Close">×</button>
                     </div>
                     <p className="mt-5 text-[10px] font-bold uppercase tracking-[0.22em] text-white/80">Your week, wrapped</p>
                     <h3 className="text-3xl font-black leading-none">{vd.title}</h3>
@@ -1883,7 +1893,7 @@ export default function VicesAiPage() {
                 <div className="flex gap-2 bg-[#1C1F24] p-4">
                   <button
                     onClick={() => shareWeek(earnedME, spentME)}
-                    className="press flex flex-1 items-center justify-center gap-2 rounded-xl bg-[#1FD173] py-3 text-[13px] font-semibold text-white transition-colors hover:bg-[#16B863]"
+                    className="press flex flex-1 items-center justify-center gap-2 rounded-xl bg-[#22C55E] py-3 text-[13px] font-semibold text-white transition-colors hover:bg-[#16A34A]"
                   >
                     <Share2 className="h-4 w-4" /> Share my week
                   </button>

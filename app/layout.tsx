@@ -1,5 +1,15 @@
 import type { Metadata, Viewport } from "next";
+import { Inter } from "next/font/google";
 import "./globals.css";
+
+// Inter — the typeface of choice for fintech / high-end utility apps. Self-hosted
+// by next/font (no external request, no layout shift). We pull it in as a CSS
+// variable so Tailwind's font-sans and our own rules can both reference it.
+const inter = Inter({
+  subsets: ["latin"],
+  display: "swap",
+  variable: "--font-inter",
+});
 
 export const metadata: Metadata = {
   title: "Vices.ai",
@@ -24,7 +34,7 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en">
+    <html lang="en" className={inter.variable}>
       <body>{children}</body>
     </html>
   );

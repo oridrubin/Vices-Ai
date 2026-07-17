@@ -4,12 +4,42 @@
 
 * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
 
-body {
-  background: #0E1013;
-  color: #F4F5F7;
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, system-ui, sans-serif;
-  line-height: 1.5;
-  -webkit-font-smoothing: antialiased;
+:root {
+  /* Neutral scale tuned slightly cool so the dark UI reads as designed, not default-black */
+  --ink-900: #0B0D10;
+  --ink-850: #101317;
+  --ink-800: #14181D;
+  --ink-700: #1A1F25;
+  --brand: #22C55E;      /* refined from neon #1FD173 — still vivid, less "AI toy" */
+  --brand-strong: #16A34A;
 }
 
+body {
+  /* Layered near-black with a faint top glow — depth instead of one flat fill */
+  background:
+    radial-gradient(120% 80% at 50% -10%, rgba(34, 197, 94, 0.06) 0%, transparent 55%),
+    var(--ink-900);
+  color: #EDEFF2;
+  font-family: var(--font-inter), -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, system-ui, sans-serif;
+  line-height: 1.5;
+  font-feature-settings: "cv02", "cv03", "cv04", "cv11"; /* Inter's refined glyph alternates */
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+
+/* Inter benefits from tighter tracking as text scales up — gives headings a
+   crafted, editorial feel instead of the loose default metrics. */
+h1, h2, h3 { letter-spacing: -0.02em; }
+.tabular-nums { font-variant-numeric: tabular-nums; }
+
+::selection { background: rgba(34, 197, 94, 0.28); }
 ::-webkit-scrollbar { display: none; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
