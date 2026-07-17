@@ -3,8 +3,8 @@
   "configurations": [
     {
       "name": "vices-ai",
-      "runtimeExecutable": "/usr/local/bin/npm",
-      "runtimeArgs": ["run", "dev"],
+      "runtimeExecutable": "node",
+      "runtimeArgs": ["node_modules/next/dist/bin/next", "start", "-p", "3001"],
       "port": 3001,
       "autoPort": false
     }

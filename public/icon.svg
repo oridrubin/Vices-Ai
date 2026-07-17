@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
+  <rect width="1024" height="1024" fill="#0E1013"/>
+  <!-- subtle radial glow behind the V -->
+  <circle cx="512" cy="500" r="360" fill="#34C759" opacity="0.08"/>
+  <!-- bold V -->
+  <path d="M 300 330 L 512 750 L 724 330"
+        fill="none" stroke="#34C759" stroke-width="96"
+        stroke-linecap="round" stroke-linejoin="round"/>
+  <!-- point dot accent -->
+  <circle cx="512" cy="252" r="44" fill="#F4F5F7"/>
+</svg>
