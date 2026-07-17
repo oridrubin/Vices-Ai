@@ -12,6 +12,7 @@ import {
   ChevronRight,
   Check,
   Cigarette,
+  Compass,
   CupSoda,
   Droplets,
   Dumbbell,
@@ -1713,6 +1714,18 @@ export default function VicesAiPage() {
                 <Settings className="h-4 w-4 text-[#8B9099]" />
                 <h3 className="text-xs font-bold uppercase tracking-[0.18em] text-[#8B9099]">Settings</h3>
               </div>
+              <button
+                onClick={() => { setSettingsOpen(false); setConfirmReset(null); setOnboardStep(0); }}
+                className="press mb-4 flex w-full items-center gap-3 rounded-xl border border-[#1FD173]/30 bg-[#1FD173]/10 px-4 py-3 text-left transition-colors hover:bg-[#1FD173]/15"
+              >
+                <span className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-lg bg-[#1FD173] text-white">
+                  <Compass className="h-4 w-4" />
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span className="block text-[13px] font-bold text-white">Replay the tour</span>
+                  <span className="block text-[10px] text-[#7B818A]">Walk through Home, Earn, Store & Friends again.</span>
+                </span>
+              </button>
               <p className="mb-3 text-[11px] italic text-[#7B818A]">Restart your progress. Tap a reset twice to confirm.</p>
               <div className="space-y-2">
                 {([
