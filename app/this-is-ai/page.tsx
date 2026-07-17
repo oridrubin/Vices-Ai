@@ -551,12 +551,13 @@ const COACH_TINT: Record<CoachBucket, string> = {
   neutral: "bg-[#252A30] text-[#AEB4BC]",
 };
 
-/** First-run onboarding — four quick cards, skippable at any point. */
-const ONBOARD: { icon: React.ReactNode; title: string; body: string }[] = [
-  { icon: <Scale className="h-7 w-7" />,       title: "Welcome to Vices.ai", body: "Do healthy things, bank points, then spend them on your vices — guilt-free." },
-  { icon: <Dumbbell className="h-7 w-7" />,    title: "Earn your allowance", body: "Log a run, a workout, a sauna — every healthy move banks points toward your weekly goal." },
-  { icon: <ShoppingBag className="h-7 w-7" />, title: "Spend in the Store",  body: "Cash your points in on the good stuff. A beer, a night out — you earned it." },
-  { icon: <Users className="h-7 w-7" />,       title: "Stay balanced",       body: "Too much grind or too much vice both cost you. Keep it even and climb the leaderboard." },
+/** First-run onboarding — an interactive tour. Each step jumps the app to a real
+ *  tab so the screen behind the card shows exactly what's being described. */
+const ONBOARD: { icon: React.ReactNode; title: string; body: string; mode: Mode }[] = [
+  { icon: <Scale className="h-7 w-7" />,       mode: "home",      title: "Welcome to Vices.ai", body: "Do healthy things, bank points, then spend them on your vices — guilt-free. This is your Home: your live balance and weekly goal." },
+  { icon: <Dumbbell className="h-7 w-7" />,    mode: "allowance", title: "Earn your allowance", body: "This is the Earn tab. Log a run, a workout, a sauna — every healthy move banks points toward your weekly goal." },
+  { icon: <ShoppingBag className="h-7 w-7" />, mode: "store",     title: "Spend in the Store",  body: "Here's the Store. Cash your points in on the good stuff — a beer, a night out. You earned it." },
+  { icon: <Users className="h-7 w-7" />,       mode: "friends",   title: "Stay balanced",       body: "And the Friends tab. Too much grind or too much vice both cost you. Keep it even and climb the leaderboard." },
 ];
 
 /** Confetti palettes for the log-entry burst. */
@@ -753,6 +754,11 @@ export default function VicesAiPage() {
       if (!localStorage.getItem("vices-onboarded-v1")) setOnboardStep(0);
     } catch { /* ignore — just skip onboarding */ }
   }, []);
+  // Interactive tour: each step drives the app to its matching tab so the live
+  // screen behind the card shows what the step is describing.
+  useEffect(() => {
+    if (onboardStep >= 0 && onboardStep < ONBOARD.length) setMode(ONBOARD[onboardStep].mode);
+  }, [onboardStep]);
   useEffect(() => {
     if (!hydrated.current) return;
     localStorage.setItem("vices-friends-v3", JSON.stringify({ week: weekOf(), friends }));
@@ -883,6 +889,7 @@ export default function VicesAiPage() {
   /** Close the tutorial and remember it so it never shows again. */
   const dismissOnboard = (): void => {
     setOnboardStep(-1);
+    setMode("home");
     try { localStorage.setItem("vices-onboarded-v1", "1"); } catch { /* ignore */ }
   };
 
@@ -1047,38 +1054,51 @@ export default function VicesAiPage() {
           </div>
         )}
 
-        {/* ─────────────── FIRST-RUN TUTORIAL (4 steps, skip anytime) ─────────────── */}
+        {/* ─────────────── FIRST-RUN INTERACTIVE TOUR (walks the tabs) ─────────────── */}
         {splashGone && onboardStep >= 0 && onboardStep < ONBOARD.length && (
-          <div className="absolute inset-0 z-50 flex items-center justify-center p-6">
-            {/* Tap the backdrop to dismiss */}
-            <div className="absolute inset-0 bg-black/65" onClick={dismissOnboard} />
+          <div className="absolute inset-0 z-50 flex items-end justify-center p-5 pb-24">
+            {/* Light scrim so the live tab behind the card stays visible; tap to close */}
+            <div
+              className="absolute inset-0 bg-gradient-to-b from-black/25 via-black/10 to-black/70"
+              onClick={dismissOnboard}
+            />
             <div
               key={onboardStep}
-              className="relative w-full max-w-[300px] rounded-3xl border border-white/10 bg-[#FAF8F4] p-6 shadow-2xl"
+              className="relative w-full max-w-[320px] rounded-3xl border border-black/5 bg-[#FAF8F4] p-6 shadow-2xl"
               style={{ animation: "fadeUp .3s ease" }}
             >
               <button
                 onClick={dismissOnboard}
-                className="absolute right-4 top-4 text-[10px] font-bold uppercase tracking-[0.16em] text-[#7B818A] transition-colors hover:text-[#C7CCD3]"
+                className="absolute right-4 top-4 text-[10px] font-bold uppercase tracking-[0.16em] text-[#9AA0A8] transition-colors hover:text-[#5B616B]"
               >
                 Skip
               </button>
               <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-[#1FD173] text-white">
                 {ONBOARD[onboardStep].icon}
               </div>
-              <h3 className="mt-4 text-lg font-black leading-tight text-white">{ONBOARD[onboardStep].title}</h3>
-              <p className="mt-1.5 text-[13px] leading-relaxed text-[#8B9099]">{ONBOARD[onboardStep].body}</p>
+              <h3 className="mt-4 text-lg font-black leading-tight text-[#14171B]">{ONBOARD[onboardStep].title}</h3>
+              <p className="mt-1.5 text-[13px] leading-relaxed text-[#525862]">{ONBOARD[onboardStep].body}</p>
               <div className="mt-5 flex items-center gap-1.5">
                 {ONBOARD.map((_, i) => (
-                  <span key={i} className={`h-1.5 rounded-full transition-all ${i === onboardStep ? "w-5 bg-[#1FD173]" : "w-1.5 bg-white/15"}`} />
+                  <span key={i} className={`h-1.5 rounded-full transition-all ${i === onboardStep ? "w-5 bg-[#1FD173]" : "w-1.5 bg-black/15"}`} />
                 ))}
               </div>
-              <button
-                onClick={() => (onboardStep === ONBOARD.length - 1 ? dismissOnboard() : setOnboardStep((s) => s + 1))}
-                className="press mt-5 w-full rounded-xl bg-[#1FD173] py-3 text-[13px] font-semibold text-white transition-colors hover:bg-[#16B863]"
-              >
-                {onboardStep === ONBOARD.length - 1 ? "Let's go" : "Next"}
-              </button>
+              <div className="mt-5 flex items-center gap-2">
+                {onboardStep > 0 && (
+                  <button
+                    onClick={() => setOnboardStep((s) => s - 1)}
+                    className="press rounded-xl border border-black/10 px-4 py-3 text-[13px] font-semibold text-[#525862] transition-colors hover:bg-black/[0.04]"
+                  >
+                    Back
+                  </button>
+                )}
+                <button
+                  onClick={() => (onboardStep === ONBOARD.length - 1 ? dismissOnboard() : setOnboardStep((s) => s + 1))}
+                  className="press flex-1 rounded-xl bg-[#1FD173] py-3 text-[13px] font-semibold text-white transition-colors hover:bg-[#16B863]"
+                >
+                  {onboardStep === ONBOARD.length - 1 ? "Let's go" : "Next"}
+                </button>
+              </div>
             </div>
           </div>
         )}
